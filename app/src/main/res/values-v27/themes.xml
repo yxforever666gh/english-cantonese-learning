@@ -1,0 +1,5 @@
+<resources>
+    <style name="Theme.EnglishCantoneseLearning" parent="Theme.EnglishCantoneseLearning.Base">
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+</resources>
