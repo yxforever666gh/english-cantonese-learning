@@ -9,24 +9,17 @@ import com.example.englishcantoneselearning.data.network.MaterialGenerator
 import com.example.englishcantoneselearning.data.preferences.MaterialProviderStore
 import com.example.englishcantoneselearning.data.preferences.MiniMaxConfigStore
 import com.example.englishcantoneselearning.data.preferences.MiniMaxVoiceCatalogStore
-import com.example.englishcantoneselearning.data.preferences.ServiceConfigStore
 import com.example.englishcantoneselearning.data.preferences.LearnerPreferences
 import com.example.englishcantoneselearning.data.repository.MaterialRepository
 import com.example.englishcantoneselearning.model.BilingualPhase
 import com.example.englishcantoneselearning.model.ArticleOrigin
 import com.example.englishcantoneselearning.model.MaterialPlaybackProgress
 import com.example.englishcantoneselearning.model.Difficulty
-import com.example.englishcantoneselearning.model.MaterialGenerationRequest
 import com.example.englishcantoneselearning.model.MaterialLanguage
 import com.example.englishcantoneselearning.model.MaterialLevelRules
 import com.example.englishcantoneselearning.model.MaterialProviderConfig
 import com.example.englishcantoneselearning.model.MaterialTopic
-import com.example.englishcantoneselearning.model.BuiltInMiniMaxVoices
 import com.example.englishcantoneselearning.model.CustomVoiceFavorite
-import com.example.englishcantoneselearning.model.MiniMaxTtsConfig
-import com.example.englishcantoneselearning.model.MiniMaxVoice
-import com.example.englishcantoneselearning.model.MiniMaxVoiceKind
-import com.example.englishcantoneselearning.model.MiniMaxVoiceSelectionPolicy
 import com.example.englishcantoneselearning.model.PlaybackMode
 import com.example.englishcantoneselearning.model.PlaybackStatus
 import com.example.englishcantoneselearning.model.SpeechLanguage
@@ -37,7 +30,6 @@ import com.example.englishcantoneselearning.speech.SpeechEvent
 import com.example.englishcantoneselearning.speech.SpeechAudioCache
 import com.example.englishcantoneselearning.speech.MiniMaxVoiceGateway
 import com.example.englishcantoneselearning.speech.MiniMaxVoiceService
-import java.time.LocalDate
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -49,25 +41,31 @@ import kotlinx.coroutines.launch
 
 class MaterialViewModel(
     private val repository: MaterialRepository,
-    private val generator: MaterialGenerator,
-    private val providerStore: MaterialProviderStore,
-    private val miniMaxConfigStore: MiniMaxConfigStore,
-    private val voiceCatalogStore: MiniMaxVoiceCatalogStore,
-    private val voiceService: MiniMaxVoiceService,
+    generator: MaterialGenerator,
+    providerStore: MaterialProviderStore,
+    miniMaxConfigStore: MiniMaxConfigStore,
+    voiceCatalogStore: MiniMaxVoiceCatalogStore,
+    voiceService: MiniMaxVoiceService,
     private val userPreferences: LearnerPreferences,
     private val speechController: SpeechController,
     private val audioCache: SpeechAudioCache,
 ) : ViewModel() {
-    private val initialVoiceCatalog = voiceCatalogStore.catalog()
-    private val initialVoiceFavorites = voiceCatalogStore.favorites()
-    private val initialMiniMaxConfig = miniMaxConfigStore.config()
+    private val generationCoordinator = MaterialGenerationCoordinator(repository, userPreferences)
+    private val settingsCoordinator = MaterialSettingsCoordinator(
+        generator,
+        providerStore,
+        miniMaxConfigStore,
+        voiceCatalogStore,
+        voiceService,
+    )
+    private val initialVoiceSettings = settingsCoordinator.voiceSnapshot()
     private val _uiState = MutableStateFlow(
         MaterialUiState(
-            materialProviders = providerStore.providers(),
-            miniMaxConfig = initialMiniMaxConfig,
-            voiceCatalog = mergeVoiceCatalog(initialVoiceCatalog?.voices.orEmpty(), initialVoiceFavorites, initialMiniMaxConfig),
-            voiceCatalogFetchedAt = initialVoiceCatalog?.fetchedAt ?: 0L,
-            customVoiceFavorites = initialVoiceFavorites,
+            materialProviders = settingsCoordinator.providers(),
+            miniMaxConfig = initialVoiceSettings.config,
+            voiceCatalog = initialVoiceSettings.voices,
+            voiceCatalogFetchedAt = initialVoiceSettings.fetchedAt,
+            customVoiceFavorites = initialVoiceSettings.favorites,
             audioCacheBytes = audioCache.sizeBytes(),
             englishListeningBand = userPreferences.learnerProfile().englishListening,
             libraryLanguage = userPreferences.articleLibraryLanguage(),
@@ -90,7 +88,7 @@ class MaterialViewModel(
         reloadMaterials()
         refreshTtsAvailability()
         viewModelScope.launch {
-            val pending = runCatching { repository.hasPendingGeneration() }.getOrDefault(false)
+            val pending = runCatching { generationCoordinator.hasPendingDraft() }.getOrDefault(false)
             _uiState.update { it.copy(hasPendingDraft = pending) }
             if (pending && _uiState.value.materialProviders.any { it.enabled && it.apiKey.isNotBlank() }) {
                 resumePendingDraft(automatic = true)
@@ -153,7 +151,7 @@ class MaterialViewModel(
         if (audioCachingJob?.isActive == true) return
         val state = _uiState.value
         val materials = state.materials.filter { it.id in state.librarySelectedArticleIds }
-        val entries = materials.flatMap(::speechCacheEntries)
+        val entries = materials.flatMap { MaterialPlaybackSupport.cacheEntries(it, speedFor = ::speedFor) }
         if (entries.isEmpty()) {
             showMessage("所选文章没有可缓存的句子")
             return
@@ -220,16 +218,7 @@ class MaterialViewModel(
             _uiState.update { it.copy(isGenerating = true, generationError = null, userMessage = null) }
             runCatching {
                 val current = _uiState.value
-                val exclusions = repository.recentSourceUrls(20)
-                val request = MaterialGenerationRequest(
-                    language = current.language,
-                    difficulty = current.difficulty,
-                    topic = current.topic,
-                    profile = userPreferences.learnerProfile(),
-                    excludedSourceUrls = exclusions,
-                    currentDate = LocalDate.now().toString(),
-                )
-                repository.generate(request) { activity ->
+                generationCoordinator.generate(current.language, current.difficulty, current.topic) { activity ->
                     _uiState.update { it.copy(generationActivity = activity) }
                 }
             }.onSuccess { generated ->
@@ -288,12 +277,12 @@ class MaterialViewModel(
                     userMessage = if (automatic) "正在自动继续未完成草稿…" else "正在继续未完成草稿…")
             }
             runCatching {
-                repository.resumePendingGeneration(automatic) { activity ->
+                generationCoordinator.resume(automatic) { activity ->
                     _uiState.update { it.copy(generationActivity = activity) }
                 }
             }.onSuccess { generated ->
                 if (generated == null) {
-                    val stillPending = runCatching { repository.hasPendingGeneration() }.getOrDefault(false)
+                    val stillPending = runCatching { generationCoordinator.hasPendingDraft() }.getOrDefault(false)
                     _uiState.update {
                         it.copy(isGenerating = false, generationActivity = null, hasPendingDraft = stillPending,
                             userMessage = if (stillPending) "草稿已暂停，请点击继续生成或删除草稿"
@@ -308,7 +297,7 @@ class MaterialViewModel(
                 }
             }.onFailure { error ->
                 if (error !is CancellationException) {
-                    val pending = runCatching { repository.hasPendingGeneration() }.getOrDefault(true)
+                    val pending = runCatching { generationCoordinator.hasPendingDraft() }.getOrDefault(true)
                     _uiState.update {
                         it.copy(isGenerating = false, generationActivity = null, hasPendingDraft = pending,
                             generationError = error.message, userMessage = error.message ?: "继续生成失败")
@@ -321,18 +310,13 @@ class MaterialViewModel(
     fun discardPendingDraft() {
         if (_uiState.value.isGenerating) return
         viewModelScope.launch {
-            repository.discardPendingGeneration()
+            generationCoordinator.discardPendingDraft()
             _uiState.update { it.copy(hasPendingDraft = false, generationError = null, userMessage = "草稿已删除") }
         }
     }
 
     fun saveProvider(provider: MaterialProviderConfig): Boolean = runCatching {
-        val normalizedProvider = provider.copy(apiKey = ServiceConfigStore.sanitizeApiKey(provider.apiKey))
-        ServiceConfigStore.validateProvider(normalizedProvider)
-        val current = providerStore.providers().toMutableList()
-        val index = current.indexOfFirst { it.id == normalizedProvider.id }
-        if (index >= 0) current[index] = normalizedProvider else current += normalizedProvider
-        providerStore.save(current)
+        settingsCoordinator.saveProvider(provider)
         reloadProviderConfigs("材料模型已保存")
     }.fold(onSuccess = { true }, onFailure = {
         showMessage(it.message ?: "无法保存材料模型")
@@ -340,21 +324,17 @@ class MaterialViewModel(
     })
 
     fun deleteProvider(id: String) {
-        providerStore.save(providerStore.providers().filterNot { it.id == id })
+        settingsCoordinator.deleteProvider(id)
         reloadProviderConfigs("材料模型已删除")
     }
 
     fun setProviderEnabled(id: String, enabled: Boolean) {
-        providerStore.save(providerStore.providers().map { if (it.id == id) it.copy(enabled = enabled) else it })
+        settingsCoordinator.setProviderEnabled(id, enabled)
         reloadProviderConfigs(null)
     }
 
     fun moveProvider(fromIndex: Int, toIndex: Int) {
-        val providers = providerStore.providers().toMutableList()
-        if (fromIndex !in providers.indices || toIndex !in providers.indices || fromIndex == toIndex) return
-        val moved = providers.removeAt(fromIndex)
-        providers.add(toIndex, moved)
-        providerStore.save(providers)
+        settingsCoordinator.moveProvider(fromIndex, toIndex)
         reloadProviderConfigs(null)
     }
 
@@ -364,7 +344,7 @@ class MaterialViewModel(
             _uiState.update {
                 it.copy(providerConnectionStates = it.providerConnectionStates + (provider.id to ConnectionState.CHECKING))
             }
-            runCatching { generator.test(provider) }
+            runCatching { settingsCoordinator.testProvider(provider) }
                 .onSuccess { supported ->
                     _uiState.update {
                         it.copy(
@@ -387,13 +367,7 @@ class MaterialViewModel(
     }
 
     fun saveMiniMax(baseUrl: String, apiKey: String): Boolean = runCatching {
-        val current = miniMaxConfigStore.config()
-        val saved = current.copy(
-            baseUrl = ServiceConfigStore.normalizeBaseUrl(baseUrl),
-            apiKey = ServiceConfigStore.sanitizeApiKey(apiKey).ifBlank { current.apiKey },
-        )
-        require(saved.apiKey.isNotBlank()) { "MiniMax API Key 不能为空" }
-        miniMaxConfigStore.save(saved)
+        val saved = settingsCoordinator.saveMiniMax(baseUrl, apiKey)
         _uiState.update {
             it.copy(miniMaxConfig = saved, miniMaxConnectionState = ConnectionState.IDLE,
                 targetAvailability = TtsAvailability.READY, mandarinAvailability = TtsAvailability.READY,
@@ -416,38 +390,35 @@ class MaterialViewModel(
 
     fun refreshVoiceCatalog(showSuccessMessage: Boolean = true) {
         if (_uiState.value.voiceCatalogState == ConnectionState.CHECKING) return
-        val config = miniMaxConfigStore.config()
+        val config = settingsCoordinator.miniMaxConfig()
         if (config.apiKey.isBlank()) {
             showMessage("请先保存MiniMax API Key")
             return
         }
         viewModelScope.launch {
             _uiState.update { it.copy(voiceCatalogState = ConnectionState.CHECKING, userMessage = null) }
-            runCatching { voiceService.fetchVoices(config) }
-                .onSuccess { catalog ->
-                    voiceCatalogStore.saveCatalog(catalog)
-                    val favorites = voiceCatalogStore.favorites()
-                    val latestConfig = miniMaxConfigStore.config()
+            runCatching { settingsCoordinator.refreshVoiceCatalog() }
+                .onSuccess { snapshot ->
                     _uiState.update {
                         it.copy(
-                            miniMaxConfig = latestConfig,
-                            voiceCatalog = mergeVoiceCatalog(catalog.voices, favorites, latestConfig),
-                            voiceCatalogFetchedAt = catalog.fetchedAt,
+                            miniMaxConfig = snapshot.config,
+                            voiceCatalog = snapshot.voices,
+                            voiceCatalogFetchedAt = snapshot.fetchedAt,
                             voiceCatalogState = ConnectionState.READY,
-                            customVoiceFavorites = favorites,
+                            customVoiceFavorites = snapshot.favorites,
                             userMessage = if (showSuccessMessage) "MiniMax音色列表已更新" else null,
                         )
                     }
                 }
                 .onFailure { error ->
-                    val cached = voiceCatalogStore.catalog()
-                    val favorites = voiceCatalogStore.favorites()
-                    val latestConfig = miniMaxConfigStore.config()
+                    val snapshot = settingsCoordinator.voiceSnapshot()
                     _uiState.update {
                         it.copy(
-                            voiceCatalog = mergeVoiceCatalog(cached?.voices.orEmpty(), favorites, latestConfig),
+                            miniMaxConfig = snapshot.config,
+                            voiceCatalog = snapshot.voices,
+                            voiceCatalogFetchedAt = snapshot.fetchedAt,
                             voiceCatalogState = ConnectionState.ERROR,
-                            customVoiceFavorites = favorites,
+                            customVoiceFavorites = snapshot.favorites,
                             userMessage = "音色列表刷新失败，继续使用本地列表：${error.message ?: "网络错误"}",
                         )
                     }
@@ -456,71 +427,30 @@ class MaterialViewModel(
     }
 
     fun selectVoice(language: SpeechLanguage, voiceId: String) {
-        val cleanId = ServiceConfigStore.sanitizeVoiceId(voiceId)
-        if (cleanId.isBlank()) {
-            showMessage("Voice ID不能为空")
-            return
-        }
-        val candidate = _uiState.value.voiceCatalog.firstOrNull { it.id == cleanId }
-            ?: BuiltInMiniMaxVoices.find(cleanId)
-        if (candidate == null || !MiniMaxVoiceSelectionPolicy.isSelectable(language, candidate)) {
-            showMessage("当前版本只允许选择该语言的MiniMax官方系统音色")
-            return
-        }
-        val current = miniMaxConfigStore.config()
-        val updated = when (language) {
-            SpeechLanguage.ENGLISH_US -> current.copy(englishVoice = cleanId)
-            SpeechLanguage.CANTONESE_HK -> current.copy(cantoneseVoice = cleanId)
-            SpeechLanguage.MANDARIN_CN -> current.copy(mandarinVoice = cleanId)
-        }
-        miniMaxConfigStore.save(updated)
-        _uiState.update {
-            it.copy(
-                miniMaxConfig = updated,
-                voiceCatalog = mergeVoiceCatalog(
-                    voiceCatalogStore.catalog()?.voices.orEmpty(),
-                    voiceCatalogStore.favorites(),
-                    updated,
-                ),
-                userMessage = "${speechLanguageName(language)}音色已设为 $cleanId",
-            )
-        }
+        runCatching { settingsCoordinator.selectVoice(language, voiceId) }
+            .onSuccess { snapshot ->
+                val cleanId = settingsCoordinator.normalizeVoiceId(voiceId)
+                applyVoiceSnapshot(snapshot, "${MaterialPlaybackSupport.languageName(language)}音色已设为 $cleanId")
+            }
+            .onFailure { showMessage(it.message ?: "无法选择音色") }
     }
 
     fun saveCustomVoice(favorite: CustomVoiceFavorite): Boolean = runCatching {
-        val voiceId = ServiceConfigStore.sanitizeVoiceId(favorite.voiceId)
-        require(voiceId.isNotBlank()) { "Voice ID不能为空" }
-        require(favorite.displayName.isNotBlank()) { "音色名称不能为空" }
-        require(favorite.languages.isNotEmpty()) { "至少选择一种适用语言" }
-        val current = voiceCatalogStore.favorites().toMutableList()
-        val index = current.indexOfFirst { it.id == favorite.id }
-        require(current.none { it.id != favorite.id && it.voiceId == voiceId }) { "该Voice ID已收藏" }
-        val knownOnline = voiceCatalogStore.catalog()?.voices.orEmpty().any { it.id == voiceId }
-        val knownBuiltIn = BuiltInMiniMaxVoices.voices.any { it.id == voiceId }
-        require(index >= 0 || (!knownOnline && !knownBuiltIn)) { "该音色已在可用列表中，无需重复收藏" }
-        val normalized = favorite.copy(displayName = favorite.displayName.trim(), voiceId = voiceId)
-        if (index >= 0) current[index] = normalized else current += normalized
-        voiceCatalogStore.saveFavorites(current)
-        reloadVoiceCatalog("自定义音色已保存")
+        applyVoiceSnapshot(settingsCoordinator.saveCustomVoice(favorite), "自定义音色已保存")
     }.fold(onSuccess = { true }, onFailure = {
         showMessage(it.message ?: "无法保存自定义音色")
         false
     })
 
     fun deleteCustomVoice(id: String) {
-        val favorite = voiceCatalogStore.favorites().firstOrNull { it.id == id } ?: return
-        val config = miniMaxConfigStore.config()
-        if (favorite.voiceId in setOf(config.englishVoice, config.cantoneseVoice, config.mandarinVoice)) {
-            showMessage("该音色正在使用，请先为对应语言选择其他音色")
-            return
-        }
-        voiceCatalogStore.saveFavorites(voiceCatalogStore.favorites().filterNot { it.id == id })
-        reloadVoiceCatalog("自定义音色已删除")
+        runCatching { settingsCoordinator.deleteCustomVoice(id) }
+            .onSuccess { snapshot -> snapshot?.let { applyVoiceSnapshot(it, "自定义音色已删除") } }
+            .onFailure { showMessage(it.message ?: "无法删除自定义音色") }
     }
 
     fun previewVoice(voiceId: String, language: SpeechLanguage) {
-        val cleanId = ServiceConfigStore.sanitizeVoiceId(voiceId)
-        if (miniMaxConfigStore.config().apiKey.isBlank()) {
+        val cleanId = settingsCoordinator.normalizeVoiceId(voiceId)
+        if (settingsCoordinator.miniMaxConfig().apiKey.isBlank()) {
             showMessage("请先保存MiniMax API Key")
             return
         }
@@ -539,7 +469,7 @@ class MaterialViewModel(
         }
         if (!speechController.preview(
                 requestId,
-                previewText(language),
+                MaterialPlaybackSupport.previewText(language),
                 language,
                 cleanId,
                 speedFor(language),
@@ -560,8 +490,7 @@ class MaterialViewModel(
     }
 
     fun clearMiniMaxKey() {
-        val cleared = miniMaxConfigStore.config().copy(apiKey = "")
-        miniMaxConfigStore.save(cleared)
+        val cleared = settingsCoordinator.clearMiniMaxKey()
         _uiState.update {
             it.copy(miniMaxConfig = cleared, miniMaxConnectionState = ConnectionState.IDLE,
                 targetAvailability = TtsAvailability.MISSING_DATA, mandarinAvailability = TtsAvailability.MISSING_DATA,
@@ -570,13 +499,12 @@ class MaterialViewModel(
     }
 
     fun resetMiniMaxUrl() {
-        val current = miniMaxConfigStore.config().copy(baseUrl = ServiceConfigStore.DEFAULT_MINIMAX_URL)
-        miniMaxConfigStore.save(current)
+        val current = settingsCoordinator.resetMiniMaxUrl()
         _uiState.update { it.copy(miniMaxConfig = current, userMessage = "已恢复MiniMax官方地址") }
     }
 
     fun testMiniMax() {
-        previewVoice(miniMaxConfigStore.config().mandarinVoice, SpeechLanguage.MANDARIN_CN)
+        previewVoice(settingsCoordinator.miniMaxConfig().mandarinVoice, SpeechLanguage.MANDARIN_CN)
     }
 
     fun clearAudioCache() {
@@ -763,7 +691,7 @@ class MaterialViewModel(
                     targetAvailability = targetAvailability,
                     mandarinAvailability = mandarinAvailability,
                     playbackStatus = PlaybackStatus.IDLE,
-                    userMessage = missingVoiceMessage(targetAvailability, mandarinAvailability),
+                    userMessage = MaterialPlaybackSupport.missingVoiceMessage(),
                 )
             }
             return
@@ -800,33 +728,11 @@ class MaterialViewModel(
     ) {
         val nextIndices = ((currentIndex + 1)..(currentIndex + DEFAULT_PRELOAD_SENTENCES))
             .filter { it in material.sentences.indices }
-        val entries = speechCacheEntries(material, nextIndices)
+        val entries = MaterialPlaybackSupport.cacheEntries(material, nextIndices, ::speedFor)
         if (entries.isEmpty()) return
         viewModelScope.launch {
             entries.forEach { speechController.preload(it.text, it.language, it.speed) }
             _uiState.update { it.copy(audioCacheBytes = audioCache.sizeBytes()) }
-        }
-    }
-
-    private data class SpeechCacheEntry(
-        val text: String,
-        val language: SpeechLanguage,
-        val speed: Float,
-    )
-
-    private fun speechCacheEntries(
-        material: com.example.englishcantoneselearning.model.PracticeMaterial,
-        indices: Iterable<Int> = material.sentences.indices.asIterable(),
-    ): List<SpeechCacheEntry> = buildList {
-        indices.forEach { index ->
-            val sentence = material.sentences.getOrNull(index) ?: return@forEach
-            val targetLanguage = material.language.toSpeechLanguage()
-            if (sentence.targetText.isNotBlank()) {
-                add(SpeechCacheEntry(sentence.targetText, targetLanguage, speedFor(targetLanguage)))
-            }
-            if (material.origin == ArticleOrigin.AI_GENERATED && sentence.simplifiedChinese?.isNotBlank() == true) {
-                add(SpeechCacheEntry(sentence.simplifiedChinese, SpeechLanguage.MANDARIN_CN, speedFor(SpeechLanguage.MANDARIN_CN)))
-            }
         }
     }
 
@@ -954,15 +860,10 @@ class MaterialViewModel(
         viewModelScope.launch { repository.savePlaybackProgress(updated) }
     }
 
-    private fun missingVoiceMessage(target: TtsAvailability, mandarin: TtsAvailability): String = when {
-        target != TtsAvailability.READY || mandarin != TtsAvailability.READY -> "请先在设置中填写MiniMax API Key"
-        else -> "MiniMax语音不可用"
-    }
-
     private fun reloadProviderConfigs(message: String?) {
         _uiState.update {
             it.copy(
-                materialProviders = providerStore.providers(),
+                materialProviders = settingsCoordinator.providers(),
                 providerConnectionStates = emptyMap(),
                 userMessage = message,
             )
@@ -970,64 +871,19 @@ class MaterialViewModel(
     }
 
     private fun reloadVoiceCatalog(message: String?) {
-        val cached = voiceCatalogStore.catalog()
-        val favorites = voiceCatalogStore.favorites()
-        val config = miniMaxConfigStore.config()
+        applyVoiceSnapshot(settingsCoordinator.voiceSnapshot(), message)
+    }
+
+    private fun applyVoiceSnapshot(snapshot: VoiceSettingsSnapshot, message: String?) {
         _uiState.update {
             it.copy(
-                miniMaxConfig = config,
-                voiceCatalog = mergeVoiceCatalog(cached?.voices.orEmpty(), favorites, config),
-                voiceCatalogFetchedAt = cached?.fetchedAt ?: 0L,
-                customVoiceFavorites = favorites,
+                miniMaxConfig = snapshot.config,
+                voiceCatalog = snapshot.voices,
+                voiceCatalogFetchedAt = snapshot.fetchedAt,
+                customVoiceFavorites = snapshot.favorites,
                 userMessage = message,
             )
         }
-    }
-
-    private fun mergeVoiceCatalog(
-        remote: List<MiniMaxVoice>,
-        favorites: List<CustomVoiceFavorite>,
-        config: MiniMaxTtsConfig,
-    ): List<MiniMaxVoice> {
-        val merged = linkedMapOf<String, MiniMaxVoice>()
-        BuiltInMiniMaxVoices.voices.forEach { merged[it.id] = it }
-        remote.forEach { voice ->
-            val builtIn = merged[voice.id]
-            merged[voice.id] = voice.copy(
-                name = voice.name.ifBlank { builtIn?.name ?: voice.id },
-                supportedLanguages = voice.supportedLanguages + builtIn?.supportedLanguages.orEmpty(),
-                description = voice.description.ifBlank { builtIn?.description.orEmpty() },
-            )
-        }
-        favorites.forEach { favorite ->
-            merged[favorite.voiceId] = MiniMaxVoice(
-                id = favorite.voiceId,
-                name = favorite.displayName,
-                kind = MiniMaxVoiceKind.CUSTOM_FAVORITE,
-                supportedLanguages = favorite.languages,
-                description = "自定义收藏",
-            )
-        }
-        listOf(config.englishVoice, config.cantoneseVoice, config.mandarinVoice).forEach { id ->
-            if (id.isNotBlank() && id !in merged) {
-                merged[id] = MiniMaxVoice(id, id, MiniMaxVoiceKind.UNKNOWN, description = "当前但未验证")
-            }
-        }
-        return merged.values.sortedWith(
-            compareBy<MiniMaxVoice> { it.kind.ordinal }.thenBy { it.name.lowercase() }.thenBy { it.id },
-        )
-    }
-
-    private fun previewText(language: SpeechLanguage): String = when (language) {
-        SpeechLanguage.ENGLISH_US -> "Welcome. Let's practice listening together."
-        SpeechLanguage.CANTONESE_HK -> "你好，我哋一齊練習廣東話聽力。"
-        SpeechLanguage.MANDARIN_CN -> "你好，我们一起练习普通话听力。"
-    }
-
-    private fun speechLanguageName(language: SpeechLanguage): String = when (language) {
-        SpeechLanguage.ENGLISH_US -> "英语"
-        SpeechLanguage.CANTONESE_HK -> "粤语"
-        SpeechLanguage.MANDARIN_CN -> "普通话"
     }
 
     private fun showMessage(message: String) = _uiState.update { it.copy(userMessage = message) }
