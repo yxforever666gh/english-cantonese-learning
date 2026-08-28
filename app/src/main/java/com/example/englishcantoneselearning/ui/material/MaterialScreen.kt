@@ -6,8 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -22,6 +20,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
+import com.example.englishcantoneselearning.R
 import com.example.englishcantoneselearning.ui.AppDestination
 import com.example.englishcantoneselearning.ui.AppNavigationBar
 import com.example.englishcantoneselearning.ui.editorialContentWidth
@@ -60,11 +60,11 @@ fun MaterialScreen(
                     navigationIcon = {
                         if (selected != null) {
                             IconButton(onClick = viewModel::closeMaterial) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回材料列表")
+                                Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = "返回材料列表")
                             }
                         } else {
                             IconButton(onClick = viewModel::clearLibrarySelection) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "退出编辑模式")
+                                Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = "退出编辑模式")
                             }
                         }
                     },

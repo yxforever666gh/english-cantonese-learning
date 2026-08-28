@@ -11,9 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -34,8 +31,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.example.englishcantoneselearning.R
 import com.example.englishcantoneselearning.model.MaterialProviderConfig
 import com.example.englishcantoneselearning.model.SpeechLanguage
 import com.example.englishcantoneselearning.ui.AppDestination
@@ -231,7 +230,7 @@ fun SettingsScreen(
                     },
                     modifier = Modifier.fillMaxWidth().testTag("add_provider_button"),
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = null)
+                    Icon(painterResource(R.drawable.ic_add), contentDescription = null)
                     Text("添加材料模型")
                 }
             }
@@ -243,7 +242,7 @@ fun SettingsScreen(
                         MetadataPill("当前占用：${formatBytes(state.audioCacheBytes)} / 500 MB", accent = true)
                         Text("超过500MB时自动删除最久未使用的音频。", style = MaterialTheme.typography.bodySmall)
                         OutlinedButton(onClick = viewModel::clearAudioCache, modifier = Modifier.fillMaxWidth()) {
-                            Icon(Icons.Default.Delete, contentDescription = null)
+                            Icon(painterResource(R.drawable.ic_delete), contentDescription = null)
                             Text("清除语音缓存")
                         }
                     }

@@ -6,11 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.Icon
@@ -24,7 +19,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.example.englishcantoneselearning.R
 import com.example.englishcantoneselearning.ui.theme.EditorialPine
 import com.example.englishcantoneselearning.ui.theme.EditorialTerracotta
 import com.example.englishcantoneselearning.model.PlaybackMode
@@ -99,7 +96,7 @@ internal fun PlayerPanel(
                 enabled = hasSelection && state.selectedIndex > 0,
                 modifier = Modifier.size(48.dp),
             ) {
-                Icon(Icons.Default.SkipPrevious, contentDescription = "上一句")
+                Icon(painterResource(R.drawable.ic_skip_previous), contentDescription = "上一句")
             }
             FilledIconButton(
                 onClick = onPlayOrPause,
@@ -111,7 +108,10 @@ internal fun PlayerPanel(
                 ),
             ) {
                 Icon(
-                    imageVector = if (state.playbackStatus == PlaybackStatus.PLAYING) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    painter = painterResource(
+                        if (state.playbackStatus == PlaybackStatus.PLAYING) R.drawable.ic_pause
+                        else R.drawable.ic_play_arrow,
+                    ),
                     contentDescription = if (state.playbackStatus == PlaybackStatus.PLAYING) "暂停" else "播放",
                     modifier = Modifier.size(32.dp),
                 )
@@ -121,7 +121,7 @@ internal fun PlayerPanel(
                 enabled = hasSelection && state.selectedIndex < state.sentences.lastIndex,
                 modifier = Modifier.size(48.dp),
             ) {
-                Icon(Icons.Default.SkipNext, contentDescription = "下一句")
+                Icon(painterResource(R.drawable.ic_skip_next), contentDescription = "下一句")
             }
         }
 

@@ -14,13 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -37,8 +30,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.englishcantoneselearning.R
 import com.example.englishcantoneselearning.model.BilingualPhase
 import com.example.englishcantoneselearning.model.Difficulty
 import com.example.englishcantoneselearning.model.MaterialLanguage
@@ -184,7 +179,7 @@ internal fun MaterialDetail(
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                             }
-                            Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "打开来源")
+                            Icon(painterResource(R.drawable.ic_open_in_new), contentDescription = "打开来源")
                         }
                     }
                     if (material.origin == ArticleOrigin.AI_GENERATED) {
@@ -196,7 +191,7 @@ internal fun MaterialDetail(
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = onDelete) {
-                            Icon(Icons.Default.Delete, contentDescription = null)
+                            Icon(painterResource(R.drawable.ic_delete), contentDescription = null)
                             Text("删除本篇")
                         }
                         if (material.batchId != material.id) TextButton(onClick = onDeleteBatch) { Text("删除旧批次") }
@@ -272,7 +267,7 @@ internal fun MaterialPlayerPanel(
                 enabled = hasSelection && state.selectedSentenceIndex > 0,
                 modifier = Modifier.size(48.dp),
             ) {
-                Icon(Icons.Default.SkipPrevious, contentDescription = "上一句")
+                Icon(painterResource(R.drawable.ic_skip_previous), contentDescription = "上一句")
             }
             FilledIconButton(
                 onClick = onPlayPause,
@@ -284,7 +279,10 @@ internal fun MaterialPlayerPanel(
                 ),
             ) {
                 Icon(
-                    if (state.playbackStatus == PlaybackStatus.PLAYING) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    painterResource(
+                        if (state.playbackStatus == PlaybackStatus.PLAYING) R.drawable.ic_pause
+                        else R.drawable.ic_play_arrow,
+                    ),
                     contentDescription = if (state.playbackStatus == PlaybackStatus.PLAYING) "暂停" else "播放",
                     modifier = Modifier.size(32.dp),
                 )
@@ -294,7 +292,7 @@ internal fun MaterialPlayerPanel(
                 enabled = hasSelection && state.selectedSentenceIndex < material.sentences.lastIndex,
                 modifier = Modifier.size(48.dp),
             ) {
-                Icon(Icons.Default.SkipNext, contentDescription = "下一句")
+                Icon(painterResource(R.drawable.ic_skip_next), contentDescription = "下一句")
             }
         }
         EditorialSegmentedControl(

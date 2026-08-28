@@ -135,7 +135,7 @@ class OpenAiResponsesMaterialGateway(
                         response.use {
                             val body = it.body
                             val isEventStream = body?.contentType()?.toString()?.contains("text/event-stream", ignoreCase = true) == true
-                            val text = if (isEventStream && it.isSuccessful && body != null) {
+                            val text = if (isEventStream && it.isSuccessful) {
                                 readEventStream(
                                     body.source(),
                                     provider,

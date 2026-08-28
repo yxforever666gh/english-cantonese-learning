@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -22,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.example.englishcantoneselearning.R
 import com.example.englishcantoneselearning.model.Difficulty
 import com.example.englishcantoneselearning.model.MaterialLanguage
 import com.example.englishcantoneselearning.model.MaterialLevelRules
@@ -166,7 +165,7 @@ internal fun MaterialCreation(
                             text = "从固定来源生成 1 篇长文",
                             onClick = onGenerate,
                             enabled = providerConfigured,
-                            icon = Icons.Default.Search,
+                            icon = R.drawable.ic_search,
                             modifier = Modifier.testTag("generate_materials_button"),
                         )
                     }

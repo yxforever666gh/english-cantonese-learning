@@ -11,11 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
@@ -39,9 +34,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.example.englishcantoneselearning.R
 import com.example.englishcantoneselearning.model.CustomVoiceFavorite
 import com.example.englishcantoneselearning.model.MiniMaxVoice
 import com.example.englishcantoneselearning.model.MiniMaxVoiceKind
@@ -126,7 +123,7 @@ internal fun VoiceSelectionScreen(
                 title = { Text("选择${speechLanguageLabel(language)}音色") },
                 navigationIcon = {
                     IconButton(onClick = onBack, modifier = Modifier.testTag("voice_selection_back")) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回设置")
+                        Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = "返回设置")
                     }
                 },
                 actions = {
@@ -136,7 +133,7 @@ internal fun VoiceSelectionScreen(
                             state.voiceCatalogState != ConnectionState.CHECKING,
                         modifier = Modifier.testTag("refresh_voice_catalog"),
                     ) {
-                        Icon(Icons.Default.Refresh, contentDescription = "刷新音色列表")
+                        Icon(painterResource(R.drawable.ic_refresh), contentDescription = "刷新音色列表")
                     }
                 },
             )
@@ -250,11 +247,11 @@ private fun CustomVoiceCard(
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = onEdit) {
-                    Icon(Icons.Default.Edit, contentDescription = null)
+                    Icon(painterResource(R.drawable.ic_edit), contentDescription = null)
                     Text("编辑")
                 }
                 TextButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, contentDescription = null)
+                    Icon(painterResource(R.drawable.ic_delete), contentDescription = null)
                     Text("删除")
                 }
             }

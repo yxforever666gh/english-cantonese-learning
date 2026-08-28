@@ -1,5 +1,6 @@
 package com.example.englishcantoneselearning.ui
 
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -19,8 +20,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -37,11 +36,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.englishcantoneselearning.R
 import com.example.englishcantoneselearning.ui.theme.EditorialInk
 import com.example.englishcantoneselearning.ui.theme.EditorialMint
 import com.example.englishcantoneselearning.ui.theme.EditorialOutline
@@ -287,7 +287,7 @@ fun EditorialPrimaryButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    icon: ImageVector? = null,
+    @DrawableRes icon: Int? = null,
 ) {
     Button(
         onClick = onClick,
@@ -303,7 +303,7 @@ fun EditorialPrimaryButton(
         elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp),
     ) {
         icon?.let {
-            Icon(it, contentDescription = null, modifier = Modifier.size(20.dp))
+            Icon(painterResource(it), contentDescription = null, modifier = Modifier.size(20.dp))
             Spacer(Modifier.size(9.dp))
         }
         Text(text, style = MaterialTheme.typography.labelLarge)
@@ -315,7 +315,7 @@ fun EditorialEmptyState(
     title: String,
     body: String,
     modifier: Modifier = Modifier,
-    icon: ImageVector = Icons.Outlined.AutoStories,
+    @DrawableRes icon: Int = R.drawable.ic_auto_stories,
 ) {
     EditorialCard(modifier = modifier.fillMaxWidth()) {
         Column(
@@ -325,7 +325,7 @@ fun EditorialEmptyState(
         ) {
             Surface(shape = CircleShape, color = EditorialMint, modifier = Modifier.size(52.dp)) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(icon, contentDescription = null, tint = EditorialPine, modifier = Modifier.size(24.dp))
+                    Icon(painterResource(icon), contentDescription = null, tint = EditorialPine, modifier = Modifier.size(24.dp))
                 }
             }
             Text(title, style = MaterialTheme.typography.titleLarge)

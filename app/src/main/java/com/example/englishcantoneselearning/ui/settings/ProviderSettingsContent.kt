@@ -6,10 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DragHandle
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -27,9 +23,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.example.englishcantoneselearning.R
 import com.example.englishcantoneselearning.model.MaterialProviderConfig
 import com.example.englishcantoneselearning.ui.EditorialCard
 import com.example.englishcantoneselearning.ui.MetadataPill
@@ -59,7 +57,7 @@ internal fun ProviderCard(
                 }
                 Switch(checked = provider.enabled, onCheckedChange = onEnabled)
                 Icon(
-                    Icons.Default.DragHandle,
+                    painterResource(R.drawable.ic_drag_handle),
                     contentDescription = "拖动排序",
                     modifier = Modifier.pointerInput(provider.id, index) {
                         detectDragGesturesAfterLongPress(
@@ -94,9 +92,15 @@ internal fun ProviderCard(
                 OutlinedButton(onClick = onTest, enabled = connectionState != ConnectionState.CHECKING) {
                     Text(if (connectionState == ConnectionState.CHECKING) "测试中…" else "测试")
                 }
-                IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, contentDescription = "编辑") }
+                IconButton(onClick = onEdit) {
+                    Icon(painterResource(R.drawable.ic_edit), contentDescription = "编辑")
+                }
                 IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, contentDescription = "删除", tint = EditorialTerracotta)
+                    Icon(
+                        painterResource(R.drawable.ic_delete),
+                        contentDescription = "删除",
+                        tint = EditorialTerracotta,
+                    )
                 }
             }
         }

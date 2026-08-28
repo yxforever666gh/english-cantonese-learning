@@ -12,10 +12,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -32,9 +28,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.example.englishcantoneselearning.R
 import com.example.englishcantoneselearning.ui.theme.EditorialInk
 import com.example.englishcantoneselearning.ui.theme.EditorialMint
 import com.example.englishcantoneselearning.ui.theme.EditorialPine
@@ -89,7 +87,7 @@ internal fun ArticleInputSection(
             EditorialPrimaryButton(
                 text = if (state.sentences.isEmpty()) "自动断句" else "重新断句",
                 onClick = onSegmentArticle,
-                icon = Icons.Default.Edit,
+                icon = R.drawable.ic_edit,
                 modifier = Modifier.testTag("segment_button"),
             )
             if (state.sentences.isNotEmpty()) {
@@ -109,7 +107,7 @@ internal fun ArticleInputSection(
                 EditorialPrimaryButton(
                     text = "保存到文章列表",
                     onClick = onSaveArticle,
-                    icon = Icons.Default.Save,
+                    icon = R.drawable.ic_save,
                     modifier = Modifier.testTag("save_manual_article"),
                 )
             }
@@ -174,7 +172,7 @@ internal fun SentenceCard(
                     onClick = { menuExpanded = true },
                     modifier = Modifier.size(40.dp),
                 ) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "句子操作")
+                    Icon(painterResource(R.drawable.ic_more_vert), contentDescription = "句子操作")
                 }
                 DropdownMenu(
                     expanded = menuExpanded,
