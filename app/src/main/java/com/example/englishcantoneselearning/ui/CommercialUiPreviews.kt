@@ -50,7 +50,7 @@ private fun ReaderReadyPreview() {
                     onSelect = {},
                 )
             },
-            bottomNavigation = { AppNavigationBar(AppDestination.SMART_MATERIALS, onSelect = {}) },
+            bottomNavigation = { AppNavigationBar(AppDestination.NEWS, onSelect = {}) },
         )
     }
 }

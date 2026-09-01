@@ -14,3 +14,4 @@
 /signing/*.jks
 /signing/*.keystore
 /signing/keystore.properties
+/signing/embedded-assets/

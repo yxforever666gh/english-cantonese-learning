@@ -15,6 +15,36 @@ class ArticleContentCleaner {
         candidate: SourceCandidate,
         html: String,
         fetchedAt: Long = System.currentTimeMillis(),
+    ): SourceArticleSnapshot = cleanWithThresholds(
+        definition = definition,
+        candidate = candidate,
+        html = html,
+        fetchedAt = fetchedAt,
+        minimumCharacters = if (definition.language == MaterialLanguage.ENGLISH) 900 else 450,
+        minimumParagraphs = 1,
+    )
+
+    fun cleanForNews(
+        definition: ArticleSourceDefinition,
+        candidate: SourceCandidate,
+        html: String,
+        fetchedAt: Long = System.currentTimeMillis(),
+    ): SourceArticleSnapshot = cleanWithThresholds(
+        definition = definition,
+        candidate = candidate,
+        html = html,
+        fetchedAt = fetchedAt,
+        minimumCharacters = if (definition.language == MaterialLanguage.ENGLISH) 350 else 180,
+        minimumParagraphs = 3,
+    )
+
+    private fun cleanWithThresholds(
+        definition: ArticleSourceDefinition,
+        candidate: SourceCandidate,
+        html: String,
+        fetchedAt: Long,
+        minimumCharacters: Int,
+        minimumParagraphs: Int,
     ): SourceArticleSnapshot {
         val document = Jsoup.parse(html, candidate.url)
         document.select(REMOVE_SELECTORS).remove()
@@ -25,8 +55,7 @@ class ArticleContentCleaner {
             ?: document.selectFirst("main")
             ?: document.body()
         val paragraphs = extractParagraphs(root, definition.language)
-        val minimumCharacters = if (definition.language == MaterialLanguage.ENGLISH) 900 else 450
-        require(paragraphs.sumOf { it.text.length } >= minimumCharacters) {
+        require(paragraphs.size >= minimumParagraphs && paragraphs.sumOf { it.text.length } >= minimumCharacters) {
             "正文过短或主要内容无法提取"
         }
         val hash = sha256(paragraphs.joinToString("\n") { "${it.heading.orEmpty()}\n${it.text}" })
@@ -101,7 +130,7 @@ class ArticleContentCleaner {
         .joinToString("") { "%02x".format(it) }
 
     companion object {
-        const val CLEANER_VERSION = "article-cleaner-v1"
+        const val CLEANER_VERSION = "article-cleaner-v2"
         private const val REMOVE_SELECTORS =
             "script,style,noscript,nav,footer,aside,form,button,figure,figcaption," +
                 ".advertisement,.advert,.ad,.promo,.related,.recommended,.share,.social,.cookie,.newsletter"

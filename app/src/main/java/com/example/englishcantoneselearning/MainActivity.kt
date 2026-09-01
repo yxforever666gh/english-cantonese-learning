@@ -9,6 +9,7 @@ import androidx.activity.viewModels
 import com.example.englishcantoneselearning.ui.LearningApp
 import com.example.englishcantoneselearning.ui.ReaderViewModel
 import com.example.englishcantoneselearning.ui.material.MaterialViewModel
+import com.example.englishcantoneselearning.ui.news.NewsViewModel
 import com.example.englishcantoneselearning.ui.theme.EnglishCantoneseLearningTheme
 
 class MainActivity : ComponentActivity() {
@@ -21,6 +22,15 @@ class MainActivity : ComponentActivity() {
 
     private val materialViewModel: MaterialViewModel by viewModels {
         MaterialViewModel.Factory(container)
+    }
+
+    private val newsViewModel: NewsViewModel by viewModels {
+        NewsViewModel.Factory(
+            sourceRepository = container.fixedSourceRepository,
+            materialRepository = container.materialRepository,
+            userPreferences = container.userPreferences,
+            speechController = container.speechController,
+        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,6 +50,7 @@ class MainActivity : ComponentActivity() {
                 LearningApp(
                     readerViewModel = readerViewModel,
                     materialViewModel = materialViewModel,
+                    newsViewModel = newsViewModel,
                 )
             }
         }
@@ -49,12 +60,14 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         readerViewModel.refreshTtsAvailability()
         materialViewModel.refreshTtsAvailability()
+        newsViewModel.refreshTtsAvailability()
     }
 
     override fun onStop() {
         if (!isChangingConfigurations) {
             readerViewModel.onAppBackgrounded()
             materialViewModel.onAppBackgrounded()
+            newsViewModel.onAppBackgrounded()
         }
         super.onStop()
     }

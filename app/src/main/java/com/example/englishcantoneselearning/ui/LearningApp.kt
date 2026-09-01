@@ -16,6 +16,8 @@ import androidx.compose.runtime.setValue
 import com.example.englishcantoneselearning.ui.material.MaterialScreen
 import com.example.englishcantoneselearning.ui.material.MaterialScreenMode
 import com.example.englishcantoneselearning.ui.material.MaterialViewModel
+import com.example.englishcantoneselearning.ui.news.NewsScreen
+import com.example.englishcantoneselearning.ui.news.NewsViewModel
 import com.example.englishcantoneselearning.ui.settings.SettingsScreen
 import com.example.englishcantoneselearning.ui.theme.AppMotion
 
@@ -23,16 +25,19 @@ import com.example.englishcantoneselearning.ui.theme.AppMotion
 fun LearningApp(
     readerViewModel: ReaderViewModel,
     materialViewModel: MaterialViewModel,
+    newsViewModel: NewsViewModel,
 ) {
     val readerState by readerViewModel.uiState.collectAsState()
     val materialState by materialViewModel.uiState.collectAsState()
-    var destination by rememberSaveable { mutableStateOf(AppDestination.SMART_MATERIALS) }
+    val newsState by newsViewModel.uiState.collectAsState()
+    var destination by rememberSaveable { mutableStateOf(AppDestination.NEWS) }
     var createTab by rememberSaveable { mutableStateOf(SmartCreateTab.AI) }
 
     fun navigate(target: AppDestination) {
         if (target == destination) return
         when (destination) {
-            AppDestination.SMART_MATERIALS -> if (createTab == SmartCreateTab.AI) {
+            AppDestination.NEWS -> newsViewModel.onLeaveScreen()
+            AppDestination.CREATE -> if (createTab == SmartCreateTab.AI) {
                 materialViewModel.onAppBackgrounded()
             } else {
                 readerViewModel.onAppBackgrounded()
@@ -54,7 +59,17 @@ fun LearningApp(
         label = "destination_transition",
     ) { currentDestination ->
         when (currentDestination) {
-            AppDestination.SMART_MATERIALS -> if (createTab == SmartCreateTab.AI) {
+            AppDestination.NEWS -> NewsScreen(
+                state = newsState,
+                viewModel = newsViewModel,
+                onCreate = { navigate(AppDestination.CREATE) },
+                onOpenSavedMaterial = { id ->
+                    navigate(AppDestination.ARTICLE_LIST)
+                    materialViewModel.openMaterialFromRepository(id)
+                },
+                bottomBar = { AppNavigationBar(AppDestination.NEWS, ::navigate) },
+            )
+            AppDestination.CREATE -> if (createTab == SmartCreateTab.AI) {
                 MaterialScreen(
                     state = materialState,
                     viewModel = materialViewModel,
@@ -62,6 +77,7 @@ fun LearningApp(
                     onOpenSettings = { navigate(AppDestination.SETTINGS) },
                     mode = MaterialScreenMode.CREATION,
                     creationSwitcher = { CreationSwitcher(createTab) { createTab = it } },
+                    onBack = { navigate(AppDestination.NEWS) },
                 )
             } else {
                 ReaderScreen(
@@ -83,7 +99,7 @@ fun LearningApp(
                     onTitleChange = readerViewModel::onArticleTitleChange,
                     onSaveArticle = readerViewModel::saveToArticleList,
                     creationSwitcher = { CreationSwitcher(createTab) { createTab = it } },
-                    bottomNavigation = { AppNavigationBar(AppDestination.SMART_MATERIALS, ::navigate) },
+                    onBack = { navigate(AppDestination.NEWS) },
                 )
             }
             AppDestination.ARTICLE_LIST -> MaterialScreen(

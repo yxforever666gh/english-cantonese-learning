@@ -8,11 +8,17 @@ import com.example.englishcantoneselearning.model.BilingualSentence
 import com.example.englishcantoneselearning.model.MaterialGenerationRequest
 import com.example.englishcantoneselearning.model.MaterialLanguage
 import com.example.englishcantoneselearning.model.MaterialPlaybackProgress
+import com.example.englishcantoneselearning.model.MaterialSection
+import com.example.englishcantoneselearning.model.NewsTag
 import com.example.englishcantoneselearning.model.PracticeMaterial
 import com.example.englishcantoneselearning.model.GenerationActivity
+import com.example.englishcantoneselearning.model.SourceArticleSnapshot
+import com.example.englishcantoneselearning.model.SourceReference
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 interface MaterialRepository {
     suspend fun listMaterials(): List<PracticeMaterial>
@@ -29,6 +35,12 @@ interface MaterialRepository {
         language: MaterialLanguage,
         sentenceTexts: List<String>,
     ): PracticeMaterial = error("当前仓库不支持保存手动文章")
+    suspend fun saveNewsArticle(
+        snapshot: SourceArticleSnapshot,
+        language: MaterialLanguage,
+        tags: Set<NewsTag>,
+        sentenceTexts: List<String>,
+    ): PracticeMaterial = error("当前仓库不支持保存新闻文章")
     suspend fun playbackProgress(): Map<String, MaterialPlaybackProgress> = emptyMap()
     suspend fun savePlaybackProgress(progress: MaterialPlaybackProgress) = Unit
     suspend fun clearPlaybackProgress(materialId: String) = Unit
@@ -49,6 +61,7 @@ class DefaultMaterialRepository(
 ) : MaterialRepository {
     private val draftStore = MaterialDraftStore(dao)
     private val chapterCoordinator = MaterialChapterGenerationCoordinator(dao, generator, draftStore)
+    private val newsSaveMutex = Mutex()
 
     override suspend fun generate(request: MaterialGenerationRequest): List<PracticeMaterial> =
         generate(request) {}
@@ -150,6 +163,108 @@ class DefaultMaterialRepository(
         material
     }
 
+    override suspend fun saveNewsArticle(
+        snapshot: SourceArticleSnapshot,
+        language: MaterialLanguage,
+        tags: Set<NewsTag>,
+        sentenceTexts: List<String>,
+    ): PracticeMaterial = withContext(Dispatchers.IO) {
+        require(snapshot.paragraphs.isNotEmpty()) { "新闻正文为空" }
+        val originalText = snapshot.paragraphs.joinToString("\n\n") { it.text.trim() }
+        require(originalText.isNotBlank()) { "新闻正文为空" }
+        val cleanSentences = sentenceTexts.map(String::trim).filter(String::isNotEmpty)
+        require(cleanSentences.isNotEmpty()) { "请先完成断句" }
+
+        newsSaveMutex.withLock {
+            findExistingNewsMaterial(snapshot)?.let { return@withLock it }
+
+            val materialId = UUID.randomUUID().toString()
+            val material = PracticeMaterial(
+                id = materialId,
+                batchId = materialId,
+                batchPosition = 0,
+                language = language,
+                difficulty = com.example.englishcantoneselearning.model.Difficulty.TARGET,
+                topic = tags.sortedBy(NewsTag::ordinal).joinToString("、", transform = NewsTag::displayName)
+                    .ifBlank { "新闻收藏" },
+                title = snapshot.title.trim().ifBlank { cleanSentences.first().take(30) },
+                targetText = originalText,
+                sentences = cleanSentences.mapIndexed { index, text ->
+                    BilingualSentence("$materialId:$index", text, null, null)
+                },
+                sources = listOf(snapshot.toSourceReference()),
+                createdAt = System.currentTimeMillis(),
+                promptVersion = NEWS_IMPORT_VERSION,
+                providerName = "新闻导入",
+                model = "",
+                responseId = "",
+                inputTokens = 0,
+                outputTokens = 0,
+                requestFingerprint = newsFingerprint(snapshot),
+                origin = ArticleOrigin.NEWS_FEED,
+                sections = buildNewsSections(snapshot, cleanSentences),
+                listeningBand = null,
+            )
+            dao.insert(material.toMaterialEntity())
+            material
+        }
+    }
+
+    private fun findExistingNewsMaterial(snapshot: SourceArticleSnapshot): PracticeMaterial? {
+        val canonicalUrl = MaterialValidator.canonicalize(snapshot.url)
+        return dao.all.asSequence()
+            .map { it.toPracticeMaterial() }
+            .firstOrNull { material ->
+                material.sources.any { source ->
+                    (snapshot.contentHash.isNotBlank() && source.contentHash == snapshot.contentHash) ||
+                        (canonicalUrl != null && MaterialValidator.canonicalize(source.url) == canonicalUrl)
+                }
+            }
+    }
+
+    private fun SourceArticleSnapshot.toSourceReference() = SourceReference(
+        title = title,
+        publisher = publisher,
+        url = url,
+        publishedAt = publishedAt,
+        sourceLanguage = sourceLanguage,
+        sourceId = sourceId,
+        contentHash = contentHash,
+        fetchedAt = fetchedAt,
+        cleanerVersion = cleanerVersion,
+    )
+
+    private fun buildNewsSections(
+        snapshot: SourceArticleSnapshot,
+        sentenceTexts: List<String>,
+    ): List<MaterialSection> {
+        var sentenceIndex = 0
+        return buildList {
+            snapshot.paragraphs.forEachIndexed { paragraphIndex, paragraph ->
+                paragraph.heading?.trim()?.takeIf(String::isNotEmpty)?.let { heading ->
+                    add(MaterialSection(paragraph.id.ifBlank { "news-section-$paragraphIndex" }, heading, sentenceIndex))
+                }
+                val paragraphText = normalizeForSentenceMatch(paragraph.text)
+                while (sentenceIndex < sentenceTexts.size &&
+                    paragraphText.contains(normalizeForSentenceMatch(sentenceTexts[sentenceIndex]))
+                ) {
+                    sentenceIndex++
+                }
+            }
+        }.distinctBy(MaterialSection::startSentenceIndex)
+    }
+
+    private fun newsFingerprint(snapshot: SourceArticleSnapshot): String {
+        val stableIdentity = snapshot.contentHash.ifBlank {
+            MaterialValidator.canonicalize(snapshot.url).orEmpty()
+        }
+        return "news-${stableIdentity.ifBlank { UUID.randomUUID().toString() }}"
+    }
+
+    private fun normalizeForSentenceMatch(text: String): String = text
+        .replace(Regex("\\s+"), "")
+        .trim()
+
     override suspend fun playbackProgress(): Map<String, MaterialPlaybackProgress> = withContext(Dispatchers.IO) {
         dao.allPlaybackProgress.associate { entity -> entity.materialId to entity.toPlaybackProgress() }
     }
@@ -169,6 +284,10 @@ class DefaultMaterialRepository(
 
     override suspend fun deleteBatch(batchId: String) = withContext(Dispatchers.IO) {
         dao.deleteBatch(batchId)
+    }
+
+    private companion object {
+        const val NEWS_IMPORT_VERSION = "news-import-v1"
     }
 
 }

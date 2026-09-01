@@ -1,5 +1,6 @@
 package com.example.englishcantoneselearning.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -15,9 +16,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -27,12 +33,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.painterResource
+import com.example.englishcantoneselearning.R
 import com.example.englishcantoneselearning.model.LearningLanguage
 import com.example.englishcantoneselearning.model.PlaybackMode
 import com.example.englishcantoneselearning.model.PlaybackStatus
 import com.example.englishcantoneselearning.model.ReaderUiState
 import com.example.englishcantoneselearning.model.SentenceItem
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReaderScreen(
     state: ReaderUiState,
@@ -54,12 +63,14 @@ fun ReaderScreen(
     onSaveArticle: () -> Unit = {},
     creationSwitcher: @Composable () -> Unit = {},
     bottomNavigation: @Composable () -> Unit = {},
+    onBack: (() -> Unit)? = null,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
     var editingSentence by remember {
         mutableStateOf<SentenceItem?>(null)
     }
+    onBack?.let { BackHandler(onBack = it) }
 
     LaunchedEffect(state.userMessage) {
         state.userMessage?.let { message ->
@@ -77,6 +88,18 @@ fun ReaderScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            onBack?.let { callback ->
+                TopAppBar(
+                    title = { Text("创建") },
+                    navigationIcon = {
+                        IconButton(onClick = callback) {
+                            Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = "返回新闻")
+                        }
+                    },
+                )
+            }
+        },
         bottomBar = {
             Column {
                 PlayerPanel(

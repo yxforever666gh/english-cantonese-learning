@@ -55,6 +55,16 @@ class MaterialPersistenceTest {
             listeningBand = null,
         )
         assertEquals(manualMaterial, manualMaterial.toMaterialEntity().toPracticeMaterial())
+
+        val newsMaterial = material.copy(
+            origin = ArticleOrigin.NEWS_FEED,
+            listeningBand = null,
+            promptVersion = "news-import-v1",
+        )
+        assertEquals(newsMaterial, newsMaterial.toMaterialEntity().toPracticeMaterial())
+
+        val unknownLegacyOrigin = material.toMaterialEntity().also { it.origin = "REMOVED_LEGACY_ORIGIN" }
+        assertEquals(ArticleOrigin.AI_GENERATED, unknownLegacyOrigin.toPracticeMaterial().origin)
     }
 
     @Test

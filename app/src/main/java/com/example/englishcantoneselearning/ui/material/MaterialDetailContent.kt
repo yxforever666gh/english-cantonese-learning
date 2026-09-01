@@ -88,10 +88,10 @@ internal fun MaterialDetail(
             EditorialPageHeader(
                 eyebrow = "",
                 title = material.title,
-                subtitle = if (material.origin == ArticleOrigin.AI_GENERATED) {
-                    "点击句子，按目标语和简体中文顺序朗读。"
-                } else {
-                    "点击任一句，立即从这里开始朗读。"
+                subtitle = when (material.origin) {
+                    ArticleOrigin.AI_GENERATED -> "点击句子，按目标语和简体中文顺序朗读。"
+                    ArticleOrigin.MANUAL_PASTE -> "点击任一句，立即从这里开始朗读。"
+                    ArticleOrigin.NEWS_FEED -> "新闻原文已保存，点击任一句开始朗读。"
                 },
             )
             Spacer(Modifier.height(14.dp))
@@ -259,7 +259,7 @@ internal fun MaterialPlayerPanel(
 ) {
     val material = state.selectedMaterial ?: return
     val ready = state.targetAvailability == TtsAvailability.READY &&
-        (material.origin == ArticleOrigin.MANUAL_PASTE || state.mandarinAvailability == TtsAvailability.READY)
+        (material.origin != ArticleOrigin.AI_GENERATED || state.mandarinAvailability == TtsAvailability.READY)
     val hasSelection = state.selectedSentenceIndex in material.sentences.indices
     val progress = state.playbackProgress[material.id]
     val percent = progress?.percent(material.sentences.size) ?: 0
@@ -282,7 +282,7 @@ internal fun MaterialPlayerPanel(
                 )
                 EditorialProgress(percent / 100f)
                 Text(
-                    if (ready && material.origin == ArticleOrigin.MANUAL_PASTE) "目标语语音已就绪"
+                    if (ready && material.origin != ArticleOrigin.AI_GENERATED) "目标语语音已就绪"
                     else if (ready) "目标语与普通话语音已就绪" else voiceStatus(state),
                     style = MaterialTheme.typography.bodySmall,
                     color = if (ready) EditorialPine else MaterialTheme.colorScheme.error,

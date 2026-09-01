@@ -33,8 +33,8 @@ android {
         applicationId = "com.example.englishcantoneselearning"
         minSdk = 26
         targetSdk = 36
-        versionCode = 12
-        versionName = "3.5"
+        versionCode = 13
+        versionName = "4.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         javaCompileOptions {
@@ -89,6 +89,8 @@ android {
         buildConfig = true
     }
 
+    sourceSets.getByName("release").assets.directories.add(rootProject.file("signing/embedded-assets").path)
+
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
@@ -105,10 +107,28 @@ val verifyStableUpdateSigning by tasks.registering {
     }
 }
 
+val verifyEmbeddedAppSeed by tasks.registering {
+    group = "verification"
+    description = "Fails when the private 4.0 settings and article seed is unavailable."
+    doLast {
+        val seedRoot = rootProject.file("signing/embedded-assets/embedded")
+        val required = listOf(
+            "service_configs.xml",
+            "learner_preferences.xml",
+            "listening-materials.db",
+        ).map(seedRoot::resolve)
+        check(required.all { it.isFile && it.length() > 0L }) {
+            "Embedded app seed is incomplete. Capture service_configs.xml, learner_preferences.xml, " +
+                "and listening-materials.db under signing/embedded-assets/embedded before building 4.0."
+        }
+    }
+}
+
 tasks.matching {
     it.name in setOf("assembleRelease", "bundleRelease", "packageRelease", "signReleaseBundle")
 }.configureEach {
     dependsOn(verifyStableUpdateSigning)
+    dependsOn(verifyEmbeddedAppSeed)
 }
 
 dependencies {

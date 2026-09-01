@@ -541,6 +541,31 @@ class MaterialViewModel(
         refreshTtsAvailability()
     }
 
+    fun openMaterialFromRepository(id: String) {
+        viewModelScope.launch {
+            val materials = runCatching { repository.listMaterials() }.getOrDefault(emptyList())
+            val material = materials.firstOrNull { it.id == id } ?: run {
+                showMessage("未找到已保存的新闻")
+                return@launch
+            }
+            val progress = runCatching { repository.playbackProgress() }.getOrDefault(emptyMap())
+            stopPlayback()
+            _uiState.update {
+                it.copy(
+                    materials = materials,
+                    playbackProgress = progress,
+                    selectedMaterial = material,
+                    selectedSentenceIndex = if (material.sentences.isEmpty()) -1 else
+                        progress[id]?.resumeSentenceIndex?.coerceIn(material.sentences.indices) ?: 0,
+                    bilingualPhase = BilingualPhase.TARGET,
+                    characterOffset = 0,
+                    isLoading = false,
+                )
+            }
+            refreshTtsAvailability()
+        }
+    }
+
     fun closeMaterial() {
         stopPlayback()
         _uiState.update { it.copy(selectedMaterial = null, selectedSentenceIndex = -1) }

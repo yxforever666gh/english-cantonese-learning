@@ -37,6 +37,7 @@ fun MaterialScreen(
     onOpenSettings: () -> Unit,
     mode: MaterialScreenMode = MaterialScreenMode.CREATION,
     creationSwitcher: @Composable () -> Unit = {},
+    onBack: (() -> Unit)? = null,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val selected = state.selectedMaterial.takeIf { mode == MaterialScreenMode.LIBRARY }
@@ -44,6 +45,9 @@ fun MaterialScreen(
         state.librarySelectedArticleIds.isNotEmpty()
     BackHandler(enabled = selected != null, onBack = viewModel::closeMaterial)
     BackHandler(enabled = libraryEditing, onBack = viewModel::clearLibrarySelection)
+    onBack?.let { callback ->
+        BackHandler(enabled = mode == MaterialScreenMode.CREATION, onBack = callback)
+    }
 
     LaunchedEffect(state.userMessage) {
         state.userMessage?.let {
@@ -54,7 +58,16 @@ fun MaterialScreen(
 
     Scaffold(
         topBar = {
-            if (selected != null || libraryEditing) {
+            if (mode == MaterialScreenMode.CREATION && onBack != null) {
+                TopAppBar(
+                    title = { Text("创建") },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = "返回新闻")
+                        }
+                    },
+                )
+            } else if (selected != null || libraryEditing) {
                 TopAppBar(
                     title = { Text(if (selected != null) "阅读详情" else "已选择 ${state.librarySelectedArticleIds.size} 篇") },
                     navigationIcon = {
@@ -74,22 +87,21 @@ fun MaterialScreen(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
-            Column {
-                if (selected != null) {
-                    MaterialPlayerPanel(
-                        state = state,
-                        onPlaybackModeChange = viewModel::setPlaybackMode,
-                        onSpeedChange = viewModel::setSpeechSpeed,
-                        onSpeedChangeFinished = viewModel::onSpeechSpeedChangeFinished,
-                        onPrevious = viewModel::previousSentence,
-                        onPlayPause = viewModel::playOrPause,
-                        onNext = viewModel::nextSentence,
-                    )
+            if (mode == MaterialScreenMode.LIBRARY) {
+                Column {
+                    if (selected != null) {
+                        MaterialPlayerPanel(
+                            state = state,
+                            onPlaybackModeChange = viewModel::setPlaybackMode,
+                            onSpeedChange = viewModel::setSpeechSpeed,
+                            onSpeedChangeFinished = viewModel::onSpeechSpeedChangeFinished,
+                            onPrevious = viewModel::previousSentence,
+                            onPlayPause = viewModel::playOrPause,
+                            onNext = viewModel::nextSentence,
+                        )
+                    }
+                    AppNavigationBar(AppDestination.ARTICLE_LIST, onNavigate)
                 }
-                AppNavigationBar(
-                    if (mode == MaterialScreenMode.CREATION) AppDestination.SMART_MATERIALS else AppDestination.ARTICLE_LIST,
-                    onNavigate,
-                )
             }
         },
     ) { padding ->
@@ -122,7 +134,7 @@ fun MaterialScreen(
                         onCacheSelected = viewModel::cacheSelectedLibraryArticles,
                         onCancelCaching = viewModel::cancelAudioCaching,
                         onDeleteSelected = viewModel::deleteSelectedLibraryArticles,
-                        onCreate = { onNavigate(AppDestination.SMART_MATERIALS) },
+                        onCreate = { onNavigate(AppDestination.CREATE) },
                     )
                 }
             } else {

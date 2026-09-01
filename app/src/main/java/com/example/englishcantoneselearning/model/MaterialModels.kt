@@ -40,6 +40,7 @@ data class BilingualSentence(
 enum class ArticleOrigin {
     AI_GENERATED,
     MANUAL_PASTE,
+    NEWS_FEED,
 }
 
 data class MaterialSection(

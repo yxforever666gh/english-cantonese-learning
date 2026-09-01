@@ -245,7 +245,11 @@ private fun MaterialCard(
                     MetadataPill(material.topic)
                 }
                 Text(
-                    "${if (material.origin == ArticleOrigin.AI_GENERATED) "AI生成" else "手动粘贴"} · " +
+                    "${when (material.origin) {
+                        ArticleOrigin.AI_GENERATED -> "AI生成"
+                        ArticleOrigin.MANUAL_PASTE -> "手动粘贴"
+                        ArticleOrigin.NEWS_FEED -> "新闻收藏"
+                    }} · " +
                         "${material.sentences.size} 句 · ${DateFormat.getDateInstance().format(progress?.updatedAt?.takeIf { it > 0 } ?: material.createdAt)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

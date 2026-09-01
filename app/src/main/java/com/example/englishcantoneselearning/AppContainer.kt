@@ -9,9 +9,11 @@ import com.example.englishcantoneselearning.data.network.FailoverMaterialGenerat
 import com.example.englishcantoneselearning.data.network.OpenAiResponsesMaterialGateway
 import com.example.englishcantoneselearning.data.preferences.ServiceConfigStore
 import com.example.englishcantoneselearning.data.preferences.UserPreferences
+import com.example.englishcantoneselearning.data.preferences.EmbeddedAppSeedInstaller
 import com.example.englishcantoneselearning.data.repository.DefaultMaterialRepository
 import com.example.englishcantoneselearning.data.repository.MaterialRepository
 import com.example.englishcantoneselearning.data.source.FixedArticleSourceRepository
+import com.example.englishcantoneselearning.data.source.SharedPreferencesNewsFeedCacheStore
 import com.example.englishcantoneselearning.model.Difficulty
 import com.example.englishcantoneselearning.model.MaterialLevelRules
 import com.example.englishcantoneselearning.data.security.SecureApiKeyStore
@@ -25,12 +27,21 @@ import okhttp3.OkHttpClient
 
 class AppContainer(context: Context) {
     private val appContext = context.applicationContext
+    private val embeddedSeedInstaller = EmbeddedAppSeedInstaller(appContext)
+    private val useEmbeddedDatabaseSeed = embeddedSeedInstaller.run {
+        installPreferencesIfEligible()
+        prepareDatabaseSeed()
+    }
     val userPreferences = UserPreferences(appContext)
     private val database = Room.databaseBuilder(
         appContext,
         MaterialDatabase::class.java,
         "listening-materials.db",
     )
+        .let { builder ->
+            if (useEmbeddedDatabaseSeed) builder.createFromAsset(EmbeddedAppSeedInstaller.DATABASE_ASSET)
+            else builder
+        }
         // Never add fallbackToDestructiveMigration here: a missing migration must fail safely
         // instead of silently deleting the learner's saved materials.
         .addMigrations(
@@ -70,6 +81,7 @@ class AppContainer(context: Context) {
             .callTimeout(30, TimeUnit.SECONDS)
             .retryOnConnectionFailure(false)
             .build(),
+        cacheStore = SharedPreferencesNewsFeedCacheStore(appContext),
     )
     val materialRepository: MaterialRepository = DefaultMaterialRepository(
         dao = database.materialDao(),

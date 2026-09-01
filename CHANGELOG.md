@@ -2,6 +2,24 @@
 
 All notable changes to this project are documented here.
 
+## [4.0] - 2026-09-01
+
+### Added
+
+- A real-time English and Cantonese news home page backed entirely by fixed RSS sources and deterministic local filtering.
+- Multi-label news classification, cached feed fallback, in-app original-article reading, single-language playback, and news bookmarking.
+- An optional ignored build-time seed channel for shipping an existing settings snapshot and Room article database inside a private APK.
+
+### Changed
+
+- Replaced the bottom navigation's Create destination with News; AI generation and pasted articles now open from the News header.
+- Split fixed-source discovery into reusable feed refresh and article-loading operations while preserving the AI material workflow.
+- News articles use a relaxed code-only body cleaner and never invoke a material-generation model.
+
+### Security
+
+- Embedded settings and databases remain outside Git through `signing/embedded-assets`; public source pushes never include runtime API keys or personal article data.
+
 ## [3.5] - 2026-09-01
 
 ### Added

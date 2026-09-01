@@ -64,11 +64,14 @@ class MaterialScreenTest {
     fun navigationShowsEditorialSelectedState() {
         composeRule.setContent {
             EnglishCantoneseLearningTheme(dynamicColor = false) {
-                AppNavigationBar(AppDestination.ARTICLE_LIST, onSelect = {})
+                AppNavigationBar(AppDestination.NEWS, onSelect = {})
             }
         }
 
-        composeRule.onNodeWithTag("nav_article_list").assertIsSelected()
+        composeRule.onNodeWithTag("nav_news").assertIsSelected()
+        composeRule.onNodeWithTag("nav_create").assertDoesNotExist()
+        composeRule.onNodeWithTag("nav_article_list").assertExists()
+        composeRule.onNodeWithTag("nav_settings").assertExists()
     }
 
     @Test

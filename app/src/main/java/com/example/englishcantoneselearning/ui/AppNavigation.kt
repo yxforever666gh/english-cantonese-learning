@@ -19,9 +19,14 @@ import androidx.compose.ui.unit.dp
 import com.example.englishcantoneselearning.R
 import com.example.englishcantoneselearning.ui.theme.AppDimensions
 
-enum class AppDestination(val label: String, @param:DrawableRes val iconRes: Int) {
-    SMART_MATERIALS("创建", R.drawable.ic_library_books),
-    ARTICLE_LIST("材料库", R.drawable.ic_article),
+enum class AppDestination(
+    val label: String,
+    @param:DrawableRes val iconRes: Int,
+    val showInBottomBar: Boolean = true,
+) {
+    NEWS("新闻", R.drawable.ic_article),
+    CREATE("创建", R.drawable.ic_add, showInBottomBar = false),
+    ARTICLE_LIST("材料库", R.drawable.ic_library_books),
     SETTINGS("设置", R.drawable.ic_settings),
 }
 
@@ -38,7 +43,7 @@ fun AppNavigationBar(
             contentColor = MaterialTheme.colorScheme.onSurface,
             tonalElevation = 0.dp,
         ) {
-            AppDestination.entries.forEach { destination ->
+            AppDestination.entries.filter(AppDestination::showInBottomBar).forEach { destination ->
                 NavigationBarItem(
                     selected = selected == destination,
                     onClick = { onSelect(destination) },
