@@ -27,8 +27,7 @@ enum class MaterialTopic(val displayName: String) {
 }
 
 data class LearnerProfile(
-    val englishListening: Float = 6.0f,
-    val cantoneseLevel: String = "A0/A1 零基础",
+    val listeningBand: Float = 6.0f,
 )
 
 data class BilingualSentence(
@@ -93,6 +92,7 @@ data class PracticeMaterial(
     val requestFingerprint: String,
     val origin: ArticleOrigin = ArticleOrigin.AI_GENERATED,
     val sections: List<MaterialSection> = emptyList(),
+    val listeningBand: Float? = null,
 )
 
 data class MaterialProviderConfig(

@@ -7,7 +7,7 @@ import com.example.englishcantoneselearning.model.MaterialLevelRules
 import java.security.MessageDigest
 
 object MaterialPromptBuilder {
-    const val PROMPT_VERSION = "listening-material-v6-source-adaptation"
+    const val PROMPT_VERSION = "listening-material-v7-global-ielts"
 
     val instructions: String = """
         You adapt one supplied, locally cleaned source article into a listening exercise. Never browse or search the web.
@@ -21,16 +21,16 @@ object MaterialPromptBuilder {
     """.trimIndent()
 
     fun input(request: MaterialGenerationRequest): String {
-        val length = lengthRule(request.language, request.difficulty)
+        val compatibleDifficulty = Difficulty.TARGET
+        val length = lengthRule(request.language, compatibleDifficulty)
+        val listeningBand = MaterialLevelRules.normalizeListeningBand(request.profile.listeningBand)
         val learnerRule = when (request.language) {
-            MaterialLanguage.ENGLISH -> {
-                val selectedBand = MaterialLevelRules.normalizeListeningBand(request.profile.englishListening)
-                val effectiveBand = MaterialLevelRules.effectiveListeningBand(selectedBand, request.difficulty)
-                "Learner selected IELTS listening $selectedBand. Effective level for this ${request.difficulty.name} request: IELTS listening $effectiveBand. " +
-                    MaterialLevelRules.englishGuidance(effectiveBand)
-            }
+            MaterialLanguage.ENGLISH ->
+                "Learner selected IELTS listening $listeningBand. " +
+                    MaterialLevelRules.englishGuidance(listeningBand)
             MaterialLanguage.CANTONESE ->
-                "Learner Cantonese level: ${request.profile.cantoneseLevel}. Use beginner-friendly colloquial expressions."
+                "Learner selected IELTS listening $listeningBand as the Cantonese complexity scale. " +
+                    MaterialLevelRules.cantoneseGuidance(listeningBand)
         }
         val targetLanguage = if (request.language == MaterialLanguage.ENGLISH) "English (en-US)" else
             "Hong Kong Cantonese (yue-HK)"
@@ -62,7 +62,7 @@ object MaterialPromptBuilder {
             Prompt version: $PROMPT_VERSION
             Date: ${request.currentDate}
             Target language: $targetLanguage
-            Difficulty: ${request.difficulty.name}
+            Difficulty: ${compatibleDifficulty.name}
             Topic: ${request.topic.displayName}
             $learnerRule
             Length rule for this chapter of the single article: $length
@@ -70,7 +70,7 @@ object MaterialPromptBuilder {
             Previous target-language tail for continuity only: ${request.previousSentenceTail.joinToString(" / ")}
             $sourceBlock
             Rewrite difficult source facts into the learner's level. Source complexity must never determine language complexity.
-            Return exactly one material object. Its difficulty must be exactly "${request.difficulty.name}".
+            Return exactly one material object. Its difficulty must be exactly "${compatibleDifficulty.name}".
             Return the supplied source metadata unchanged in sources and exactly these IDs in covered_paragraph_ids: ${request.expectedParagraphIds.joinToString(",")}.
             Include outline_sections, covered_section_ids, covered_paragraph_ids, sections, has_more, and next_section_index.
             Set has_more=${!finalChapter}. Do not repeat earlier sentence pairs.
@@ -83,11 +83,9 @@ object MaterialPromptBuilder {
         val raw = buildString {
             append(PROMPT_VERSION)
             append('|').append(request.language)
-            append('|').append(request.difficulty)
             append('|').append(request.topic)
             append('|').append(request.currentDate)
-            append('|').append(MaterialLevelRules.normalizeListeningBand(request.profile.englishListening))
-            append('|').append(request.profile.cantoneseLevel)
+            append('|').append(MaterialLevelRules.normalizeListeningBand(request.profile.listeningBand))
             append('|').append(request.sourceSnapshot?.contentHash.orEmpty())
             append('|').append(request.sourceSnapshot?.url.orEmpty())
             request.excludedSourceUrls.sorted().take(20).forEach { append('|').append(it) }
@@ -97,6 +95,7 @@ object MaterialPromptBuilder {
             .joinToString("") { "%02x".format(it) }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     fun lengthRule(language: MaterialLanguage, difficulty: Difficulty): String =
-        MaterialLevelRules.length(language, difficulty).promptText()
+        MaterialLevelRules.length(language, Difficulty.TARGET).promptText()
 }

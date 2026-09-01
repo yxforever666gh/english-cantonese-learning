@@ -99,18 +99,18 @@ fun ReaderScreen(
             LazyColumn(
                 modifier = Modifier.editorialContentWidth(),
                 state = listState,
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 22.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 item(key = "input") {
                     EditorialPageHeader(
-                        eyebrow = "Read · Split · Listen",
-                        title = "粘贴文章",
-                        subtitle = "把真实语料整理成可逐句编辑、反复聆听的学习文本。",
+                        eyebrow = "",
+                        title = "创建学习材料",
+                        subtitle = "粘贴原文，逐句编辑并反复朗读。",
                     )
-                    Spacer(Modifier.height(20.dp))
-                    creationSwitcher()
                     Spacer(Modifier.height(16.dp))
+                    creationSwitcher()
+                    Spacer(Modifier.height(12.dp))
                     ArticleInputSection(
                         state = state,
                         onArticleTextChange = onArticleTextChange,
@@ -122,10 +122,10 @@ fun ReaderScreen(
 
                     AnimatedVisibility(state.sentences.isNotEmpty()) {
                         Column {
-                            Spacer(Modifier.height(24.dp))
+                            Spacer(Modifier.height(20.dp))
                             EditorialSectionHeader(
-                                title = "断句结果（${state.sentences.size} 句）",
-                                subtitle = "点击句子可立即朗读；右侧菜单可编辑、拆分或合并。",
+                                title = "逐句朗读（${state.sentences.size}）",
+                                subtitle = "点击播放；更多菜单可编辑、拆分或合并。",
                             )
                         }
                     }

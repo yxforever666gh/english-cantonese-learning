@@ -2,10 +2,9 @@ package com.example.englishcantoneselearning.ui.material
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,6 +19,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -29,16 +29,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.example.englishcantoneselearning.model.MaterialLanguage
 import com.example.englishcantoneselearning.model.PracticeMaterial
 import com.example.englishcantoneselearning.model.ArticleOrigin
-import com.example.englishcantoneselearning.ui.EditorialCard
 import com.example.englishcantoneselearning.ui.EditorialEmptyState
 import com.example.englishcantoneselearning.ui.EditorialPageHeader
 import com.example.englishcantoneselearning.ui.EditorialProgress
+import com.example.englishcantoneselearning.ui.EditorialPrimaryButton
 import com.example.englishcantoneselearning.ui.EditorialSectionHeader
 import com.example.englishcantoneselearning.ui.EditorialSegmentedControl
 import com.example.englishcantoneselearning.ui.EditorialStatusPanel
@@ -61,6 +63,7 @@ internal fun ArticleLibrary(
     onCacheSelected: () -> Unit,
     onCancelCaching: () -> Unit,
     onDeleteSelected: () -> Unit,
+    onCreate: () -> Unit,
 ) {
     val englishCount = state.materials.count { it.language == MaterialLanguage.ENGLISH }
     val cantoneseCount = state.materials.count { it.language == MaterialLanguage.CANTONESE }
@@ -108,16 +111,16 @@ internal fun ArticleLibrary(
     }
     LazyColumn(
         modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 22.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
             EditorialPageHeader(
-                eyebrow = "Your Reading Shelf",
-                title = "文章列表",
-                subtitle = "集中保存生成材料与手动文章，随时回到上次的聆听进度。",
+                eyebrow = "",
+                title = "材料库",
+                subtitle = "继续上次的阅读和听力进度。",
             )
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(16.dp))
             EditorialSegmentedControl(
                 options = listOf(
                     MaterialLanguage.ENGLISH to "English（$englishCount）",
@@ -131,10 +134,10 @@ internal fun ArticleLibrary(
                     )
                 },
             )
-            Spacer(Modifier.height(22.dp))
+            Spacer(Modifier.height(18.dp))
             EditorialSectionHeader(
-                title = "已保存${languageName}文章（${filteredMaterials.size}）",
-                subtitle = "生成材料和自建文章都会显示在这里；长按可批量管理。",
+                title = "${languageName}学习材料（${filteredMaterials.size}）",
+                subtitle = "长按材料可批量缓存或删除。",
             )
         }
         if (editing) {
@@ -173,8 +176,14 @@ internal fun ArticleLibrary(
         if (!state.isLoading && filteredMaterials.isEmpty()) {
             item {
                 EditorialEmptyState(
-                    title = "书架还是空的",
-                    body = "还没有保存的${languageName}文章，请先到“智能材料”生成或粘贴保存。",
+                    title = "还没有${languageName}学习材料",
+                    body = "创建一份适合当前水平的内容，开始逐句阅读和朗读。",
+                )
+                Spacer(Modifier.height(12.dp))
+                EditorialPrimaryButton(
+                    text = "创建学习材料",
+                    onClick = onCreate,
+                    modifier = Modifier.testTag("empty_library_create"),
                 )
             }
         }
@@ -203,26 +212,36 @@ private fun MaterialCard(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
-    EditorialCard(
+    val haptics = LocalHapticFeedback.current
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("library_article_${material.id}")
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
-        containerColor = if (selected) EditorialMint else EditorialSurface,
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onLongClick()
+                },
+            ),
+        color = if (selected) EditorialMint else EditorialSurface,
+        shape = RoundedCornerShape(16.dp),
+        tonalElevation = if (selected) 0.dp else 1.dp,
     ) {
-        Row(Modifier.padding(18.dp), verticalAlignment = Alignment.Top) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.Top) {
             if (selectionMode) {
                 Checkbox(checked = selected, onCheckedChange = { onClick() })
                 Spacer(Modifier.size(6.dp))
             }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                Text(material.title, style = MaterialTheme.typography.titleLarge, color = EditorialInk)
-                Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                Text(material.title, style = MaterialTheme.typography.titleMedium, color = EditorialInk)
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     MetadataPill(languageLabel(material.language), accent = true)
-                    MetadataPill(difficultyLabel(material.difficulty))
+                    material.listeningBand?.let { MetadataPill("IELTS 听力 ${formatBand(it)}") }
                     MetadataPill(material.topic)
                 }
                 Text(

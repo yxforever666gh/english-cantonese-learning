@@ -1,7 +1,6 @@
 package com.example.englishcantoneselearning.ui.material
 
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -14,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -21,9 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.example.englishcantoneselearning.R
-import com.example.englishcantoneselearning.model.Difficulty
 import com.example.englishcantoneselearning.model.MaterialLanguage
-import com.example.englishcantoneselearning.model.MaterialLevelRules
 import com.example.englishcantoneselearning.model.MaterialTopic
 import com.example.englishcantoneselearning.model.GenerationStage
 import com.example.englishcantoneselearning.ui.EditorialCard
@@ -41,7 +39,7 @@ internal fun MaterialCreation(
     state: MaterialUiState,
     modifier: Modifier,
     onLanguage: (MaterialLanguage) -> Unit,
-    onDifficulty: (Difficulty) -> Unit,
+    onListeningBand: (Float) -> Unit,
     onTopic: (MaterialTopic) -> Unit,
     onGenerate: () -> Unit,
     onCancel: () -> Unit,
@@ -53,16 +51,16 @@ internal fun MaterialCreation(
     val providerConfigured = state.materialProviders.any { it.enabled && it.apiKey.isNotBlank() }
     LazyColumn(
         modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 22.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
             EditorialPageHeader(
-                eyebrow = "Curated Practice",
-                title = "智能材料",
-                subtitle = "从固定来源生成与你当前水平匹配的英粤听力长文。",
+                eyebrow = "",
+                title = "创建学习材料",
+                subtitle = "选择语言、IELTS 听力等级和主题。",
             )
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(16.dp))
             creationSwitcher()
         }
         if (!providerConfigured) {
@@ -80,7 +78,7 @@ internal fun MaterialCreation(
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     EditorialSectionHeader(
                         title = "生成设置",
-                        subtitle = "选择练习语言、难度与文章主题。",
+                        subtitle = "生成内容会保存到材料库。",
                     )
                     EditorialSegmentedControl(
                         options = listOf(MaterialLanguage.ENGLISH to "English", MaterialLanguage.CANTONESE to "粤语"),
@@ -94,36 +92,34 @@ internal fun MaterialCreation(
                     )
 
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("难度", style = MaterialTheme.typography.labelLarge)
-                        if (state.language == MaterialLanguage.ENGLISH) {
-                            val levels = "IELTS 听力 ${formatBand(state.englishListeningBand)}：" +
-                                "轻松 ${formatBand(MaterialLevelRules.effectiveListeningBand(state.englishListeningBand, Difficulty.EASY))} · " +
-                                "适合 ${formatBand(MaterialLevelRules.effectiveListeningBand(state.englishListeningBand, Difficulty.TARGET))} · " +
-                                "挑战 ${formatBand(MaterialLevelRules.effectiveListeningBand(state.englishListeningBand, Difficulty.CHALLENGE))}"
-                            EditorialStatusPanel(
-                                title = "个人化分级",
-                                body = levels,
-                                tone = EditorialStatusTone.INFO,
-                                modifier = Modifier.testTag("material_ielts_levels"),
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("IELTS 听力等级", style = MaterialTheme.typography.labelLarge)
+                            Text(
+                                formatBand(state.listeningBand),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
                             )
                         }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Difficulty.entries.forEach { difficulty ->
-                                EditorialChoiceChip(
-                                    selected = state.difficulty == difficulty,
-                                    onClick = { onDifficulty(difficulty) },
-                                    label = difficultyLabel(difficulty),
-                                    modifier = Modifier.testTag("difficulty_${difficulty.name.lowercase()}"),
-                                )
-                            }
-                        }
+                        Slider(
+                            value = state.listeningBand,
+                            onValueChange = onListeningBand,
+                            valueRange = 1f..9f,
+                            steps = 15,
+                            modifier = Modifier.fillMaxWidth().testTag("ielts_listening_slider"),
+                        )
+                        Text(
+                            "英语和粤语共用此等级；分数越高，词汇、语法和表达越复杂。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
 
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("主题", style = MaterialTheme.typography.labelLarge)
-                        Row(
-                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             MaterialTopic.entries.forEach { topic ->
                                 EditorialChoiceChip(
@@ -162,7 +158,7 @@ internal fun MaterialCreation(
                         )
                     } else {
                         EditorialPrimaryButton(
-                            text = "从固定来源生成 1 篇长文",
+                            text = "生成学习材料",
                             onClick = onGenerate,
                             enabled = providerConfigured,
                             icon = R.drawable.ic_search,

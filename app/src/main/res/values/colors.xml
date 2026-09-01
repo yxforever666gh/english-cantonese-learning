@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="app_background">#F6F7F3</color>
+    <color name="brand_surface">#FFFFFF</color>
+    <color name="brand_pine">#174A43</color>
+    <color name="brand_pine_deep">#103832</color>
+    <color name="brand_mint">#DDEBE5</color>
+    <color name="brand_terracotta">#C66A45</color>
+</resources>

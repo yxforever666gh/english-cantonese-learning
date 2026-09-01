@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.englishcantoneselearning.AppContainer
+import com.example.englishcantoneselearning.data.preferences.DEFAULT_SPEECH_SPEED
+import com.example.englishcantoneselearning.data.preferences.LearnerPreferences
 import com.example.englishcantoneselearning.data.repository.MaterialRepository
 import com.example.englishcantoneselearning.model.MaterialLanguage
 import com.example.englishcantoneselearning.model.LearningLanguage
@@ -12,6 +14,7 @@ import com.example.englishcantoneselearning.model.PlaybackStatus
 import com.example.englishcantoneselearning.model.ReaderUiState
 import com.example.englishcantoneselearning.model.SentenceItem
 import com.example.englishcantoneselearning.model.TtsAvailability
+import com.example.englishcantoneselearning.model.SpeechLanguage
 import com.example.englishcantoneselearning.model.toSpeechLanguage
 import com.example.englishcantoneselearning.segmentation.RuleBasedSentenceSegmenter
 import com.example.englishcantoneselearning.segmentation.SentenceSegmenter
@@ -30,8 +33,14 @@ class ReaderViewModel(
     private val sentenceSegmenter: SentenceSegmenter = RuleBasedSentenceSegmenter(),
     private val shutdownSpeechControllerOnClear: Boolean = true,
     private val materialRepository: MaterialRepository? = null,
+    private val userPreferences: LearnerPreferences? = null,
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(ReaderUiState())
+    private val localSpeechSpeeds = SpeechLanguage.entries.associateWith { DEFAULT_SPEECH_SPEED }.toMutableMap()
+    private val _uiState = MutableStateFlow(
+        ReaderUiState(
+            speed = userPreferences?.speechSpeed(SpeechLanguage.ENGLISH_US) ?: DEFAULT_SPEECH_SPEED,
+        ),
+    )
     val uiState: StateFlow<ReaderUiState> = _uiState.asStateFlow()
 
     private val requestIds = AtomicLong(1)
@@ -41,6 +50,15 @@ class ReaderViewModel(
     init {
         viewModelScope.launch {
             speechController.events.collect(::handleSpeechEvent)
+        }
+        userPreferences?.let { preferences ->
+            viewModelScope.launch {
+                preferences.speechSpeeds.collect { speeds ->
+                    _uiState.update { state ->
+                        state.copy(speed = speeds.forLanguage(state.language.toSpeechLanguage()))
+                    }
+                }
+            }
         }
         refreshTtsAvailability()
     }
@@ -70,6 +88,7 @@ class ReaderViewModel(
         _uiState.update {
             it.copy(
                 language = language,
+                speed = speechSpeed(language.toSpeechLanguage()),
                 sentences = emptyList(),
                 selectedIndex = -1,
                 characterOffset = 0,
@@ -132,6 +151,9 @@ class ReaderViewModel(
     fun onSpeedChange(speed: Float) {
         val normalized = ((speed.coerceIn(0.5f, 2.0f) * 10).roundToInt() / 10f)
         _uiState.update { it.copy(speed = normalized) }
+        val language = _uiState.value.language.toSpeechLanguage()
+        localSpeechSpeeds[language] = normalized
+        userPreferences?.setSpeechSpeed(language, normalized)
     }
 
     fun onSpeedChangeFinished() {
@@ -422,6 +444,9 @@ class ReaderViewModel(
         _uiState.update { it.copy(userMessage = message) }
     }
 
+    private fun speechSpeed(language: SpeechLanguage): Float =
+        userPreferences?.speechSpeed(language) ?: localSpeechSpeeds.getValue(language)
+
     private fun availabilityMessage(availability: TtsAvailability): String = when (availability) {
         TtsAvailability.INITIALIZING -> "MiniMax语音正在初始化，请稍候"
         TtsAvailability.MISSING_DATA -> "请先在设置中填写MiniMax API Key"
@@ -434,8 +459,14 @@ class ReaderViewModel(
         private val controller: SpeechController,
         private val sharedController: Boolean,
         private val repository: MaterialRepository?,
+        private val preferences: LearnerPreferences?,
     ) : ViewModelProvider.Factory {
-        constructor(container: AppContainer) : this(container.speechController, true, container.materialRepository)
+        constructor(container: AppContainer) : this(
+            container.speechController,
+            true,
+            container.materialRepository,
+            container.userPreferences,
+        )
 
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -444,6 +475,7 @@ class ReaderViewModel(
                 speechController = controller,
                 shutdownSpeechControllerOnClear = !sharedController,
                 materialRepository = repository,
+                userPreferences = preferences,
             ) as T
         }
     }

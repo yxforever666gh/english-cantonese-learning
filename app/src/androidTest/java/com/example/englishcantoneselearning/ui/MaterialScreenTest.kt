@@ -17,6 +17,7 @@ import androidx.compose.runtime.collectAsState
 import com.example.englishcantoneselearning.data.network.GeneratedBatch
 import com.example.englishcantoneselearning.data.network.MaterialGenerator
 import com.example.englishcantoneselearning.data.preferences.LearnerPreferences
+import com.example.englishcantoneselearning.data.preferences.SpeechSpeedPreferences
 import com.example.englishcantoneselearning.data.preferences.MaterialProviderStore
 import com.example.englishcantoneselearning.data.preferences.MiniMaxConfigStore
 import com.example.englishcantoneselearning.data.preferences.MiniMaxVoiceCatalogStore
@@ -49,6 +50,7 @@ import com.example.englishcantoneselearning.ui.settings.SettingsScreen
 import com.example.englishcantoneselearning.ui.theme.EnglishCantoneseLearningTheme
 import java.io.File
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -118,14 +120,15 @@ class MaterialScreenTest {
             }
         }
 
+        composeRule.onNodeWithTag("minimax_configure_button").performClick()
         composeRule.onNodeWithTag("minimax_key_input").performTextInput("new-device-test-key")
         composeRule.onNodeWithTag("save_minimax_button").assertIsEnabled().performClick()
 
         composeRule.runOnIdle {
             assertEquals("new-device-test-key", dependencies.configStore.miniMax.apiKey)
         }
-        composeRule.onNodeWithTag("settings_list").performScrollToIndex(6)
-        composeRule.onNodeWithTag("ielts_listening_slider").assertExists()
+        composeRule.onNodeWithTag("settings_list").performScrollToIndex(5)
+        composeRule.onNodeWithTag("ielts_listening_slider").assertDoesNotExist()
     }
 
     @Test
@@ -159,7 +162,7 @@ class MaterialScreenTest {
         }
         composeRule.onNodeWithTag("voice_selection_screen_ENGLISH_US").assertExists()
         composeRule.onNodeWithTag("voice_selection_back").performClick()
-        composeRule.onNodeWithTag("minimax_key_input").assertExists()
+        composeRule.onNodeWithTag("minimax_configure_button").assertExists()
         composeRule.onNodeWithTag("add_custom_voice_button").assertDoesNotExist()
     }
 
@@ -185,14 +188,17 @@ class MaterialScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("IELTS 听力 6.0：轻松 5.5 · 适合 6.0 · 挑战 6.5").assertExists()
+        composeRule.onNodeWithTag("ielts_listening_slider").assertExists()
+        composeRule.onNodeWithTag("difficulty_easy").assertDoesNotExist()
+        composeRule.onNodeWithTag("difficulty_target").assertDoesNotExist()
+        composeRule.onNodeWithTag("difficulty_challenge").assertDoesNotExist()
         composeRule.onNodeWithTag("material_language_cantonese").performClick()
-        composeRule.onNodeWithTag("difficulty_easy").performClick()
         composeRule.onNodeWithText("文化").performClick()
+        composeRule.runOnIdle { viewModel.setListeningBand(6.5f) }
 
         composeRule.runOnIdle {
             assertEquals(MaterialLanguage.CANTONESE, viewModel.uiState.value.language)
-            assertEquals(Difficulty.EASY, viewModel.uiState.value.difficulty)
+            assertEquals(6.5f, viewModel.uiState.value.listeningBand)
             assertEquals(MaterialTopic.CULTURE, viewModel.uiState.value.topic)
         }
     }
@@ -201,7 +207,8 @@ class MaterialScreenTest {
     fun articleListFiltersLanguagesAndLongPressEntersBatchEdit() {
         val ai = englishMaterial()
         val manual = ai.copy(id = "manual", title = "Manual saved article",
-            origin = com.example.englishcantoneselearning.model.ArticleOrigin.MANUAL_PASTE)
+            origin = com.example.englishcantoneselearning.model.ArticleOrigin.MANUAL_PASTE,
+            listeningBand = null)
         val cantonese = cantoneseMaterial()
         val dependencies = TestMaterialDependencies(listOf(ai, manual, cantonese))
         val viewModel = dependencies.viewModel()
@@ -221,14 +228,14 @@ class MaterialScreenTest {
         composeRule.waitUntil { !viewModel.uiState.value.isLoading }
         composeRule.onNodeWithText("English（2）").assertExists()
         composeRule.onNodeWithText("粤语（1）").assertExists()
-        composeRule.onNodeWithText("已保存英语文章（2）").assertExists()
+        composeRule.onNodeWithText("英语学习材料（2）").assertExists()
         composeRule.onNodeWithText("Saved English material").assertExists()
         composeRule.onNodeWithText("Manual saved article").assertExists()
         composeRule.onNodeWithText("手动粘贴", substring = true).assertExists()
         composeRule.onNodeWithText("粤语问候").assertDoesNotExist()
 
         composeRule.onNodeWithTag("library_language_cantonese").performClick()
-        composeRule.onNodeWithText("已保存粤语文章（1）").assertExists()
+        composeRule.onNodeWithText("粤语学习材料（1）").assertExists()
         composeRule.onNodeWithText("粤语问候").assertExists()
         composeRule.onNodeWithText("Saved English material").assertDoesNotExist()
 
@@ -255,7 +262,7 @@ class MaterialScreenTest {
         }
         composeRule.waitUntil { !viewModel.uiState.value.isLoading }
         composeRule.onNodeWithTag("library_language_cantonese").performClick()
-        composeRule.onNodeWithText("还没有保存的粤语文章，请先到“智能材料”生成或粘贴保存。").assertExists()
+        composeRule.onNodeWithText("还没有粤语学习材料").assertExists()
     }
 
     @Test
@@ -288,7 +295,14 @@ class MaterialScreenTest {
         composeRule.onNodeWithText("nei5 hou2 aa3").assertExists()
         composeRule.onNodeWithText("正在生成 MiniMax 语音…").assertExists()
         composeRule.onNodeWithTag("material_detail_list").performScrollToIndex(2)
+        composeRule.onNodeWithText("材料信息").performClick()
         composeRule.onNodeWithText("Source article").assertExists()
+        composeRule.onNodeWithText("IELTS 听力 5.5").assertExists()
+        composeRule.onNodeWithTag("material_player_expand").performClick()
+        composeRule.onNodeWithText("粤语语速").assertExists()
+        composeRule.onNodeWithText("中文翻译语速").assertExists()
+        composeRule.onNodeWithTag("material_speed_cantonese_hk").assertExists()
+        composeRule.onNodeWithTag("material_speed_mandarin_cn").assertExists()
     }
 }
 
@@ -333,13 +347,16 @@ private class TestVoiceService : MiniMaxVoiceService {
 private class TestPreferences : LearnerPreferences {
     private var profile = LearnerProfile()
     private var libraryLanguage = MaterialLanguage.ENGLISH
-    private val speeds = SpeechLanguage.entries.associateWith { 1f }.toMutableMap()
+    private val mutableSpeeds = MutableStateFlow(SpeechSpeedPreferences(0.8f, 0.8f, 0.8f))
+    override val speechSpeeds = mutableSpeeds
     override fun learnerProfile() = profile
-    override fun setEnglishListening(band: Float) { profile = profile.copy(englishListening = band) }
+    override fun setListeningBand(band: Float) { profile = profile.copy(listeningBand = band) }
     override fun articleLibraryLanguage() = libraryLanguage
     override fun setArticleLibraryLanguage(language: MaterialLanguage) { libraryLanguage = language }
-    override fun speechSpeed(language: SpeechLanguage) = speeds.getValue(language)
-    override fun setSpeechSpeed(language: SpeechLanguage, speed: Float) { speeds[language] = speed }
+    override fun speechSpeed(language: SpeechLanguage) = mutableSpeeds.value.forLanguage(language)
+    override fun setSpeechSpeed(language: SpeechLanguage, speed: Float) {
+        mutableSpeeds.value = mutableSpeeds.value.withSpeed(language, speed)
+    }
 }
 
 private class TestRepository(materials: List<PracticeMaterial>) : MaterialRepository {
@@ -381,6 +398,7 @@ private fun englishMaterial() = PracticeMaterial(
     sources = listOf(SourceReference("Source article", "Publisher", "https://example.com/en", null, "English")),
     createdAt = 1L, promptVersion = "listening-material-v1", providerName = "Wawa", model = "gpt-5.6-sol",
     responseId = "resp-en", inputTokens = 1, outputTokens = 2, requestFingerprint = "fp-en",
+    listeningBand = 6.0f,
 )
 
 private fun cantoneseMaterial() = PracticeMaterial(
@@ -391,4 +409,5 @@ private fun cantoneseMaterial() = PracticeMaterial(
     sources = listOf(SourceReference("Source article", "Publisher", "https://example.com/yue", null, "繁体中文")),
     createdAt = 1L, promptVersion = "listening-material-v1", providerName = "Wawa", model = "gpt-5.6-sol",
     responseId = "resp-yue", inputTokens = 1, outputTokens = 2, requestFingerprint = "fp-yue",
+    listeningBand = 5.5f,
 )

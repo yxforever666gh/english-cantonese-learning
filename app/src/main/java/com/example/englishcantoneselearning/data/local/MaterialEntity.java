@@ -1,6 +1,7 @@
 package com.example.englishcantoneselearning.data.local;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.room.Entity;
 import androidx.room.PrimaryKey;
 
@@ -28,6 +29,7 @@ public class MaterialEntity {
     @NonNull public String requestFingerprint;
     @NonNull public String origin;
     @NonNull public String sectionsJson;
+    @Nullable public Float listeningBand;
 
     public MaterialEntity() {
         id = "";

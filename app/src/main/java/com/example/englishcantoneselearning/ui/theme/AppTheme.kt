@@ -10,143 +10,141 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-val EditorialPaper = Color(0xFFF5F2EA)
-val EditorialSurface = Color(0xFFFFFEFA)
-val EditorialInk = Color(0xFF172524)
-val EditorialPine = Color(0xFF173F3B)
-val EditorialMint = Color(0xFFDDEAE4)
-val EditorialTerracotta = Color(0xFFC96B43)
-val EditorialOutline = Color(0xFFD8D3C8)
+val AppBackground = Color(0xFFF6F7F3)
+val AppSurface = Color(0xFFFFFFFF)
+val AppSurfaceSubtle = Color(0xFFF0F3EF)
+val AppPine = Color(0xFF174A43)
+val AppPineDeep = Color(0xFF103832)
+val AppMint = Color(0xFFDDEBE5)
+val AppInk = Color(0xFF18211F)
+val AppTextSecondary = Color(0xFF66706C)
+val AppTextMuted = Color(0xFF89918E)
+val AppDivider = Color(0xFFE2E6E1)
+val AppTerracotta = Color(0xFFC66A45)
+val AppSuccess = Color(0xFF2F6B52)
+val AppWarning = Color(0xFF93621F)
+val AppError = Color(0xFFA43D32)
 
-private val EditorialLightColors = lightColorScheme(
-    primary = EditorialPine,
+// Compatibility aliases kept while feature screens migrate to the neutral design tokens.
+val EditorialPaper = AppBackground
+val EditorialSurface = AppSurface
+val EditorialInk = AppInk
+val EditorialPine = AppPine
+val EditorialMint = AppMint
+val EditorialTerracotta = AppTerracotta
+val EditorialOutline = AppDivider
+
+internal object AppSpacing {
+    val xxs = 4.dp
+    val xs = 8.dp
+    val sm = 12.dp
+    val md = 16.dp
+    val page = 20.dp
+    val lg = 24.dp
+    val xl = 32.dp
+    val xxl = 40.dp
+}
+
+internal object AppDimensions {
+    val minimumTouchTarget = 48.dp
+    val primaryButtonHeight = 50.dp
+    val navigationBarHeight = 72.dp
+    val miniPlayerHeight = 80.dp
+    val pageMaxWidth = 720.dp
+    val divider = 1.dp
+    val activeIndicator = 3.dp
+    val icon = 24.dp
+}
+
+internal object AppMotion {
+    const val fast = 150
+    const val standard = 180
+    const val deliberate = 200
+}
+
+internal object AppRadii {
+    val label: Dp = 10.dp
+    val control: Dp = 12.dp
+    val card: Dp = 16.dp
+    val sheet: Dp = 24.dp
+}
+
+private val AppLightColors = lightColorScheme(
+    primary = AppPine,
     onPrimary = Color.White,
-    primaryContainer = EditorialMint,
-    onPrimaryContainer = EditorialInk,
-    secondary = EditorialTerracotta,
+    primaryContainer = AppMint,
+    onPrimaryContainer = AppPineDeep,
+    secondary = AppPineDeep,
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFF7E2D7),
-    onSecondaryContainer = Color(0xFF522412),
-    tertiary = Color(0xFF6D6253),
+    secondaryContainer = AppSurfaceSubtle,
+    onSecondaryContainer = AppInk,
+    tertiary = AppTerracotta,
     onTertiary = Color.White,
-    tertiaryContainer = Color(0xFFEDE6D9),
-    onTertiaryContainer = Color(0xFF2C2821),
-    error = Color(0xFF9C3B2C),
+    tertiaryContainer = Color(0xFFF7E2D8),
+    onTertiaryContainer = Color(0xFF572517),
+    error = AppError,
     onError = Color.White,
-    errorContainer = Color(0xFFF8DDD7),
-    onErrorContainer = Color(0xFF45150F),
-    background = EditorialPaper,
-    onBackground = EditorialInk,
-    surface = EditorialSurface,
-    onSurface = EditorialInk,
-    surfaceVariant = Color(0xFFEAE6DD),
-    onSurfaceVariant = Color(0xFF5C625D),
-    outline = EditorialOutline,
-    outlineVariant = Color(0xFFE7E2D8),
-    inverseSurface = EditorialInk,
-    inverseOnSurface = EditorialPaper,
-    inversePrimary = Color(0xFFAAD2C5),
-    surfaceDim = Color(0xFFE4E0D8),
-    surfaceBright = EditorialSurface,
-    surfaceContainerLowest = Color.White,
-    surfaceContainerLow = Color(0xFFFBF9F3),
-    surfaceContainer = Color(0xFFF2EFE7),
-    surfaceContainerHigh = Color(0xFFECE8DF),
-    surfaceContainerHighest = Color(0xFFE5E1D8),
+    errorContainer = Color(0xFFF8DEDA),
+    onErrorContainer = Color(0xFF521A14),
+    background = AppBackground,
+    onBackground = AppInk,
+    surface = AppSurface,
+    onSurface = AppInk,
+    surfaceVariant = AppSurfaceSubtle,
+    onSurfaceVariant = AppTextSecondary,
+    outline = AppDivider,
+    outlineVariant = Color(0xFFEDF0EC),
+    inverseSurface = AppPineDeep,
+    inverseOnSurface = AppBackground,
+    inversePrimary = Color(0xFFA7D5C8),
+    surfaceDim = Color(0xFFE7EAE5),
+    surfaceBright = AppSurface,
+    surfaceContainerLowest = AppSurface,
+    surfaceContainerLow = Color(0xFFF9FAF7),
+    surfaceContainer = AppSurfaceSubtle,
+    surfaceContainerHigh = Color(0xFFEAEDE9),
+    surfaceContainerHighest = Color(0xFFE4E8E3),
 )
 
-private val EditorialTypography = Typography(
-    displayLarge = TextStyle(
-        fontFamily = FontFamily.Serif,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 42.sp,
-        lineHeight = 48.sp,
-        letterSpacing = (-0.5).sp,
-    ),
-    headlineLarge = TextStyle(
-        fontFamily = FontFamily.Serif,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 32.sp,
-        lineHeight = 38.sp,
-        letterSpacing = (-0.25).sp,
-    ),
-    headlineMedium = TextStyle(
-        fontFamily = FontFamily.Serif,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 26.sp,
-        lineHeight = 32.sp,
-    ),
-    headlineSmall = TextStyle(
-        fontFamily = FontFamily.Serif,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 22.sp,
-        lineHeight = 28.sp,
-    ),
-    titleLarge = TextStyle(
-        fontFamily = FontFamily.Serif,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 20.sp,
-        lineHeight = 27.sp,
-    ),
-    titleMedium = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 17.sp,
-        lineHeight = 24.sp,
-    ),
-    titleSmall = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 15.sp,
-        lineHeight = 21.sp,
-    ),
-    bodyLarge = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontSize = 17.sp,
-        lineHeight = 26.sp,
-    ),
-    bodyMedium = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontSize = 15.sp,
-        lineHeight = 22.sp,
-    ),
-    bodySmall = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontSize = 13.sp,
-        lineHeight = 19.sp,
-    ),
-    labelLarge = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 14.sp,
-        lineHeight = 20.sp,
-        letterSpacing = 0.1.sp,
-    ),
-    labelMedium = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.Medium,
-        fontSize = 12.sp,
-        lineHeight = 17.sp,
-        letterSpacing = 0.35.sp,
-    ),
-    labelSmall = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 11.sp,
-        lineHeight = 16.sp,
-        letterSpacing = 0.65.sp,
-    ),
+private val AppTypography = Typography(
+    displayLarge = appTextStyle(34, 40, FontWeight.SemiBold, -0.3f),
+    headlineLarge = appTextStyle(28, 34, FontWeight.SemiBold, -0.2f),
+    headlineMedium = appTextStyle(24, 30, FontWeight.SemiBold, -0.1f),
+    headlineSmall = appTextStyle(20, 26, FontWeight.SemiBold),
+    titleLarge = appTextStyle(20, 26, FontWeight.SemiBold),
+    titleMedium = appTextStyle(16, 22, FontWeight.SemiBold),
+    titleSmall = appTextStyle(15, 21, FontWeight.SemiBold),
+    bodyLarge = appTextStyle(16, 24, FontWeight.Normal),
+    bodyMedium = appTextStyle(15, 22, FontWeight.Normal),
+    bodySmall = appTextStyle(13, 19, FontWeight.Normal),
+    labelLarge = appTextStyle(14, 20, FontWeight.SemiBold, 0.1f),
+    labelMedium = appTextStyle(12, 16, FontWeight.Medium, 0.2f),
+    labelSmall = appTextStyle(11, 16, FontWeight.Medium, 0.3f),
 )
 
-private val EditorialShapes = Shapes(
-    extraSmall = RoundedCornerShape(8.dp),
-    small = RoundedCornerShape(12.dp),
-    medium = RoundedCornerShape(16.dp),
+private fun appTextStyle(
+    size: Int,
+    height: Int,
+    weight: FontWeight,
+    tracking: Float = 0f,
+) = TextStyle(
+    fontFamily = FontFamily.SansSerif,
+    fontWeight = weight,
+    fontSize = size.sp,
+    lineHeight = height.sp,
+    letterSpacing = tracking.sp,
+)
+
+private val AppShapes = Shapes(
+    extraSmall = RoundedCornerShape(AppRadii.label),
+    small = RoundedCornerShape(AppRadii.control),
+    medium = RoundedCornerShape(AppRadii.card),
     large = RoundedCornerShape(20.dp),
-    extraLarge = RoundedCornerShape(28.dp),
+    extraLarge = RoundedCornerShape(AppRadii.sheet),
 )
 
 @Composable
@@ -156,9 +154,9 @@ fun EnglishCantoneseLearningTheme(
     content: @Composable () -> Unit,
 ) {
     MaterialTheme(
-        colorScheme = EditorialLightColors,
-        typography = EditorialTypography,
-        shapes = EditorialShapes,
+        colorScheme = AppLightColors,
+        typography = AppTypography,
+        shapes = AppShapes,
         content = content,
     )
 }

@@ -129,6 +129,8 @@ class ReaderScreenTest {
         }
 
         composeRule.onNodeWithText("First sentence.").assertExists().performClick()
+        composeRule.onNodeWithTag("reader_player_expand").performClick()
+        composeRule.onNodeWithText("英语语速").assertExists()
         composeRule.onNodeWithTag("mode_single").performClick()
         composeRule.runOnIdle {
             assertEquals(0, selectedSentence)

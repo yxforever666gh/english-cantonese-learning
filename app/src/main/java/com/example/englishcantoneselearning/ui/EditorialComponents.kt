@@ -4,10 +4,12 @@ import androidx.annotation.DrawableRes
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -35,57 +37,27 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.englishcantoneselearning.R
-import com.example.englishcantoneselearning.ui.theme.EditorialInk
-import com.example.englishcantoneselearning.ui.theme.EditorialMint
-import com.example.englishcantoneselearning.ui.theme.EditorialOutline
+import com.example.englishcantoneselearning.ui.theme.AppDimensions
+import com.example.englishcantoneselearning.ui.theme.AppMotion
+import com.example.englishcantoneselearning.ui.theme.AppRadii
+import com.example.englishcantoneselearning.ui.theme.AppSpacing
 import com.example.englishcantoneselearning.ui.theme.EditorialPine
-import com.example.englishcantoneselearning.ui.theme.EditorialSurface
 import com.example.englishcantoneselearning.ui.theme.EditorialTerracotta
 
 const val EditorialMaxContentWidth = 720
 
 enum class EditorialStatusTone { INFO, SUCCESS, WARNING, ERROR }
 
+/** Compact, neutral page heading used by every top-level destination. */
 @Composable
-fun EditorialPageHeader(
-    eyebrow: String,
-    title: String,
-    subtitle: String,
-    modifier: Modifier = Modifier,
-    trailing: (@Composable () -> Unit)? = null,
-) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.Top,
-    ) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            Text(
-                text = eyebrow.uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                color = EditorialTerracotta,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(text = title, style = MaterialTheme.typography.headlineLarge, color = EditorialInk)
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        trailing?.invoke()
-    }
-}
-
-@Composable
-fun EditorialSectionHeader(
+internal fun AppPageHeader(
     title: String,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
@@ -93,13 +65,119 @@ fun EditorialSectionHeader(
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(AppSpacing.md),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(title, style = MaterialTheme.typography.titleLarge, color = EditorialInk)
-            subtitle?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineLarge,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            subtitle?.takeIf { it.isNotBlank() }?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        trailing?.invoke()
+    }
+}
+
+/** A section heading with optional content, keeping hierarchy consistent across screens. */
+@Composable
+internal fun AppSection(
+    title: String,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    trailing: (@Composable () -> Unit)? = null,
+    content: (@Composable ColumnScope.() -> Unit)? = null,
+) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(AppSpacing.xxs)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                subtitle?.takeIf { it.isNotBlank() }?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            trailing?.invoke()
+        }
+        content?.invoke(this)
+    }
+}
+
+/** The single elevated grouping surface. Avoid nesting this component inside itself. */
+@Composable
+internal fun AppCard(
+    modifier: Modifier = Modifier,
+    containerColor: Color = MaterialTheme.colorScheme.surface,
+    contentPadding: PaddingValues = PaddingValues(AppSpacing.md),
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(AppRadii.card),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp, pressedElevation = 1.dp),
+    ) {
+        Column(Modifier.padding(contentPadding), content = content)
+    }
+}
+
+/** Consistent, fully clickable settings/library row with stable 48dp touch targets. */
+@Composable
+internal fun AppListRow(
+    title: String,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    enabled: Boolean = true,
+    onClick: (() -> Unit)? = null,
+    leading: (@Composable () -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null,
+) {
+    val interactionModifier = if (onClick == null) Modifier else Modifier.clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = AppDimensions.minimumTouchTarget)
+            .then(interactionModifier)
+            .padding(horizontal = AppSpacing.md, vertical = AppSpacing.sm),
+        horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        leading?.invoke()
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(AppSpacing.xxs)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            subtitle?.takeIf { it.isNotBlank() }?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.38f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
         trailing?.invoke()
@@ -107,23 +185,41 @@ fun EditorialSectionHeader(
 }
 
 @Composable
-fun EditorialCard(
+internal fun AppStatusBanner(
+    title: String,
+    body: String,
     modifier: Modifier = Modifier,
-    containerColor: Color = EditorialSurface,
-    content: @Composable ColumnScope.() -> Unit,
+    tone: EditorialStatusTone = EditorialStatusTone.INFO,
+    action: (@Composable () -> Unit)? = null,
 ) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = containerColor),
-        border = BorderStroke(1.dp, EditorialOutline.copy(alpha = 0.78f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        content = { Column(content = content) },
-    )
+    val (background, accent) = when (tone) {
+        EditorialStatusTone.INFO -> MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.tertiary
+        EditorialStatusTone.SUCCESS -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.primary
+        EditorialStatusTone.WARNING -> MaterialTheme.colorScheme.secondaryContainer to EditorialTerracotta
+        EditorialStatusTone.ERROR -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.error
+    }
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(AppRadii.control),
+        color = background,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = AppSpacing.md, vertical = AppSpacing.sm),
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Surface(shape = CircleShape, color = accent, modifier = Modifier.size(AppSpacing.xs)) {}
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(AppSpacing.xxs)) {
+                Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+                Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            action?.invoke()
+        }
+    }
 }
 
 @Composable
-fun <T> EditorialSegmentedControl(
+internal fun <T> AppSegmentedControl(
     options: List<Pair<T, String>>,
     selected: T,
     onSelect: (T) -> Unit,
@@ -132,13 +228,12 @@ fun <T> EditorialSegmentedControl(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(AppRadii.control),
         color = MaterialTheme.colorScheme.surfaceContainer,
-        border = BorderStroke(1.dp, EditorialOutline.copy(alpha = 0.72f)),
     ) {
-        Row(Modifier.padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(Modifier.padding(AppSpacing.xxs), horizontalArrangement = Arrangement.spacedBy(AppSpacing.xxs)) {
             options.forEach { (value, label) ->
-                EditorialSegment(
+                AppSegment(
                     selected = selected == value,
                     label = label,
                     onClick = { onSelect(value) },
@@ -150,27 +245,27 @@ fun <T> EditorialSegmentedControl(
 }
 
 @Composable
-private fun RowScope.EditorialSegment(
+private fun RowScope.AppSegment(
     selected: Boolean,
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val background by animateColorAsState(
-        targetValue = if (selected) EditorialSurface else Color.Transparent,
-        animationSpec = tween(180),
+        targetValue = if (selected) MaterialTheme.colorScheme.surface else Color.Transparent,
+        animationSpec = tween(AppMotion.standard),
         label = "segment_background",
     )
     val foreground by animateColorAsState(
-        targetValue = if (selected) EditorialPine else MaterialTheme.colorScheme.onSurfaceVariant,
-        animationSpec = tween(180),
+        targetValue = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = tween(AppMotion.standard),
         label = "segment_foreground",
     )
     Surface(
         modifier = modifier
-            .heightIn(min = 44.dp)
+            .heightIn(min = AppDimensions.minimumTouchTarget)
             .selectable(selected = selected, onClick = onClick, role = Role.Tab),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(AppRadii.label),
         color = background,
         shadowElevation = if (selected) 1.dp else 0.dp,
     ) {
@@ -179,6 +274,221 @@ private fun RowScope.EditorialSegment(
         }
     }
 }
+
+@Composable
+internal fun AppMetadataChip(
+    text: String,
+    modifier: Modifier = Modifier,
+    accent: Boolean = false,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(AppRadii.label),
+        color = if (accent) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = AppSpacing.xs, vertical = AppSpacing.xxs),
+            style = MaterialTheme.typography.labelSmall,
+            color = if (accent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+internal fun AppEmptyState(
+    title: String,
+    body: String,
+    modifier: Modifier = Modifier,
+    @DrawableRes icon: Int = R.drawable.ic_auto_stories,
+    action: (@Composable () -> Unit)? = null,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(AppRadii.card),
+        color = MaterialTheme.colorScheme.surface,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = AppSpacing.lg, vertical = AppSpacing.lg),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.xs),
+        ) {
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(48.dp)) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        painterResource(icon),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(AppDimensions.icon),
+                    )
+                }
+            }
+            Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+            Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            action?.let {
+                Spacer(Modifier.height(AppSpacing.xxs))
+                it()
+            }
+        }
+    }
+}
+
+/** Compact playback surface. The caller owns transport controls and expanded-sheet state. */
+@Composable
+internal fun AppMiniPlayer(
+    title: String,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    progress: Float? = null,
+    enabled: Boolean = true,
+    onClick: (() -> Unit)? = null,
+    controls: @Composable RowScope.() -> Unit,
+) {
+    val clickModifier = if (onClick == null) Modifier else Modifier.clickable(enabled = enabled, onClick = onClick)
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = AppDimensions.miniPlayerHeight)
+            .clip(RoundedCornerShape(topStart = AppRadii.card, topEnd = AppRadii.card))
+            .then(clickModifier),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 2.dp,
+    ) {
+        Column {
+            progress?.let {
+                LinearProgressIndicator(
+                    progress = { it.coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth().height(AppDimensions.activeIndicator),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    drawStopIndicator = {},
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = AppSpacing.md, vertical = AppSpacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm),
+            ) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(AppSpacing.xxs)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    subtitle?.takeIf { it.isNotBlank() }?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                controls()
+            }
+        }
+    }
+}
+
+@Composable
+internal fun AppProgress(
+    progress: Float,
+    modifier: Modifier = Modifier,
+    accent: Color = MaterialTheme.colorScheme.primary,
+) {
+    LinearProgressIndicator(
+        progress = { progress.coerceIn(0f, 1f) },
+        modifier = modifier.fillMaxWidth().height(AppSpacing.xxs),
+        color = accent,
+        trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        drawStopIndicator = {},
+    )
+}
+
+@Composable
+internal fun AppPrimaryButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    @DrawableRes icon: Int? = null,
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.fillMaxWidth().heightIn(min = AppDimensions.primaryButtonHeight),
+        shape = RoundedCornerShape(AppRadii.control),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.62f),
+        ),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 1.dp),
+    ) {
+        icon?.let {
+            Icon(painterResource(it), contentDescription = null, modifier = Modifier.size(AppDimensions.icon))
+            Spacer(Modifier.size(AppSpacing.xs))
+        }
+        Text(text, style = MaterialTheme.typography.labelLarge)
+    }
+}
+
+@Composable
+internal fun AppPlayerSurface(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(topStart = AppRadii.card, topEnd = AppRadii.card),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shadowElevation = 2.dp,
+        tonalElevation = 0.dp,
+    ) {
+        Column(Modifier.padding(horizontal = AppSpacing.md, vertical = AppSpacing.sm), content = content)
+    }
+}
+
+// Compatibility layer: existing screens keep their signatures while inheriting the new system.
+@Composable
+fun EditorialPageHeader(
+    @Suppress("UNUSED_PARAMETER") eyebrow: String,
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier,
+    trailing: (@Composable () -> Unit)? = null,
+) = AppPageHeader(title = title, subtitle = subtitle, modifier = modifier, trailing = trailing)
+
+@Composable
+fun EditorialSectionHeader(
+    title: String,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    trailing: (@Composable () -> Unit)? = null,
+) = AppSection(title = title, subtitle = subtitle, modifier = modifier, trailing = trailing)
+
+@Composable
+fun EditorialCard(
+    modifier: Modifier = Modifier,
+    containerColor: Color = MaterialTheme.colorScheme.surface,
+    content: @Composable ColumnScope.() -> Unit,
+) = AppCard(modifier = modifier, containerColor = containerColor, contentPadding = PaddingValues(0.dp), content = content)
+
+@Composable
+fun <T> EditorialSegmentedControl(
+    options: List<Pair<T, String>>,
+    selected: T,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier,
+    optionModifier: (T) -> Modifier = { Modifier },
+) = AppSegmentedControl(options, selected, onSelect, modifier, optionModifier)
 
 @Composable
 fun EditorialChoiceChip(
@@ -191,43 +501,26 @@ fun EditorialChoiceChip(
         selected = selected,
         onClick = onClick,
         label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        modifier = modifier.heightIn(min = 44.dp),
-        shape = RoundedCornerShape(12.dp),
+        modifier = modifier.heightIn(min = AppDimensions.minimumTouchTarget),
+        shape = RoundedCornerShape(AppRadii.label),
         border = FilterChipDefaults.filterChipBorder(
             enabled = true,
             selected = selected,
-            borderColor = EditorialOutline,
-            selectedBorderColor = EditorialPine,
+            borderColor = MaterialTheme.colorScheme.outlineVariant,
+            selectedBorderColor = Color.Transparent,
         ),
         colors = FilterChipDefaults.filterChipColors(
-            containerColor = Color.Transparent,
+            containerColor = MaterialTheme.colorScheme.surface,
             labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            selectedContainerColor = EditorialMint,
-            selectedLabelColor = EditorialPine,
+            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+            selectedLabelColor = MaterialTheme.colorScheme.primary,
         ),
     )
 }
 
 @Composable
-fun MetadataPill(
-    text: String,
-    modifier: Modifier = Modifier,
-    accent: Boolean = false,
-) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(999.dp),
-        color = if (accent) EditorialMint else MaterialTheme.colorScheme.surfaceContainer,
-        border = BorderStroke(1.dp, if (accent) EditorialPine.copy(alpha = 0.24f) else EditorialOutline),
-    ) {
-        Text(
-            text = text,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = if (accent) EditorialPine else MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
+fun MetadataPill(text: String, modifier: Modifier = Modifier, accent: Boolean = false) =
+    AppMetadataChip(text = text, modifier = modifier, accent = accent)
 
 @Composable
 fun EditorialStatusPanel(
@@ -236,50 +529,11 @@ fun EditorialStatusPanel(
     modifier: Modifier = Modifier,
     tone: EditorialStatusTone = EditorialStatusTone.INFO,
     action: (@Composable () -> Unit)? = null,
-) {
-    val (background, accent) = when (tone) {
-        EditorialStatusTone.INFO -> MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.tertiary
-        EditorialStatusTone.SUCCESS -> EditorialMint to EditorialPine
-        EditorialStatusTone.WARNING -> MaterialTheme.colorScheme.secondaryContainer to EditorialTerracotta
-        EditorialStatusTone.ERROR -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.error
-    }
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = background,
-        border = BorderStroke(1.dp, accent.copy(alpha = 0.22f)),
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            Surface(shape = CircleShape, color = accent, modifier = Modifier.size(9.dp)) {}
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(title, style = MaterialTheme.typography.titleSmall, color = EditorialInk)
-                Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                action?.let {
-                    Spacer(Modifier.height(2.dp))
-                    it()
-                }
-            }
-        }
-    }
-}
+) = AppStatusBanner(title, body, modifier, tone, action)
 
 @Composable
-fun EditorialProgress(
-    progress: Float,
-    modifier: Modifier = Modifier,
-    accent: Color = EditorialPine,
-) {
-    LinearProgressIndicator(
-        progress = { progress.coerceIn(0f, 1f) },
-        modifier = modifier.fillMaxWidth().height(6.dp),
-        color = accent,
-        trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-    )
-}
+fun EditorialProgress(progress: Float, modifier: Modifier = Modifier, accent: Color = EditorialPine) =
+    AppProgress(progress = progress, modifier = modifier, accent = accent)
 
 @Composable
 fun EditorialPrimaryButton(
@@ -288,27 +542,7 @@ fun EditorialPrimaryButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     @DrawableRes icon: Int? = null,
-) {
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier.fillMaxWidth().heightIn(min = 54.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = EditorialPine,
-            contentColor = Color.White,
-            disabledContainerColor = EditorialOutline,
-            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        ),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp),
-    ) {
-        icon?.let {
-            Icon(painterResource(it), contentDescription = null, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.size(9.dp))
-        }
-        Text(text, style = MaterialTheme.typography.labelLarge)
-    }
-}
+) = AppPrimaryButton(text, onClick, modifier, enabled, icon)
 
 @Composable
 fun EditorialEmptyState(
@@ -316,43 +550,12 @@ fun EditorialEmptyState(
     body: String,
     modifier: Modifier = Modifier,
     @DrawableRes icon: Int = R.drawable.ic_auto_stories,
-) {
-    EditorialCard(modifier = modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 34.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Surface(shape = CircleShape, color = EditorialMint, modifier = Modifier.size(52.dp)) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(painterResource(icon), contentDescription = null, tint = EditorialPine, modifier = Modifier.size(24.dp))
-                }
-            }
-            Text(title, style = MaterialTheme.typography.titleLarge)
-            Text(
-                body,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
+) = AppEmptyState(title = title, body = body, modifier = modifier, icon = icon)
 
 @Composable
 fun EditorialPlayerSurface(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(26.dp),
-        color = EditorialSurface,
-        border = BorderStroke(1.dp, EditorialOutline.copy(alpha = 0.8f)),
-        shadowElevation = 8.dp,
-        tonalElevation = 0.dp,
-    ) {
-        Column(Modifier.padding(horizontal = 20.dp, vertical = 12.dp), content = content)
-    }
-}
+) = AppPlayerSurface(modifier, content)
 
 fun Modifier.editorialContentWidth(): Modifier = fillMaxWidth().widthIn(max = EditorialMaxContentWidth.dp)

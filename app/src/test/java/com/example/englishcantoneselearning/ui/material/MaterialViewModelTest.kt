@@ -3,6 +3,7 @@ package com.example.englishcantoneselearning.ui.material
 import com.example.englishcantoneselearning.data.network.GeneratedBatch
 import com.example.englishcantoneselearning.data.network.MaterialGenerator
 import com.example.englishcantoneselearning.data.preferences.LearnerPreferences
+import com.example.englishcantoneselearning.data.preferences.SpeechSpeedPreferences
 import com.example.englishcantoneselearning.data.preferences.MaterialProviderStore
 import com.example.englishcantoneselearning.data.preferences.MiniMaxConfigStore
 import com.example.englishcantoneselearning.data.preferences.MiniMaxVoiceCatalogStore
@@ -30,8 +31,11 @@ import com.example.englishcantoneselearning.speech.SpeechAudioCache
 import com.example.englishcantoneselearning.speech.MiniMaxVoiceService
 import java.io.File
 import com.example.englishcantoneselearning.ui.MainDispatcherRule
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -208,14 +212,38 @@ class MaterialViewModelTest {
     }
 
     @Test
-    fun listeningBandIsRoundedClampedAndPersisted() {
-        viewModel.setEnglishListeningBand(6.26f)
-        assertEquals(6.5f, viewModel.uiState.value.englishListeningBand)
-        assertEquals(6.5f, preferences.learnerProfile().englishListening)
+    fun observedGlobalSpeechSpeedUpdatesMaterialState() {
+        preferences.setSpeechSpeed(SpeechLanguage.ENGLISH_US, 1.4f)
+        mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
 
-        viewModel.setEnglishListeningBand(12f)
-        assertEquals(9f, viewModel.uiState.value.englishListeningBand)
-        assertEquals(9f, preferences.learnerProfile().englishListening)
+        assertEquals(1.4f, viewModel.uiState.value.englishSpeed)
+        assertEquals(0.8f, viewModel.uiState.value.cantoneseSpeed)
+        assertEquals(0.8f, viewModel.uiState.value.mandarinSpeed)
+    }
+
+    @Test
+    fun finishingTargetSpeedChangeRestartsActiveSegmentFromBeginning() = runTest {
+        viewModel.openMaterial("material-1")
+        viewModel.selectAndPlaySentence(0)
+        speech.emit(SpeechEvent.Started(speech.spoken.single().requestId))
+
+        viewModel.setSpeechSpeed(SpeechLanguage.ENGLISH_US, 1.2f)
+        viewModel.onSpeechSpeedChangeFinished(SpeechLanguage.ENGLISH_US)
+
+        assertEquals(2, speech.spoken.size)
+        assertEquals(1.2f, speech.spoken.last().speed)
+        assertEquals(0, speech.spoken.last().startOffset)
+    }
+
+    @Test
+    fun listeningBandIsRoundedClampedAndPersisted() {
+        viewModel.setListeningBand(6.26f)
+        assertEquals(6.5f, viewModel.uiState.value.listeningBand)
+        assertEquals(6.5f, preferences.learnerProfile().listeningBand)
+
+        viewModel.setListeningBand(12f)
+        assertEquals(9f, viewModel.uiState.value.listeningBand)
+        assertEquals(9f, preferences.learnerProfile().listeningBand)
     }
 
     @Test
@@ -230,7 +258,7 @@ class MaterialViewModelTest {
     }
 
     @Test
-    fun playbackPreloadsNextThreeBilingualSentences() {
+    fun playbackPreloadsCurrentTranslationAndNextTwoBilingualSentences() {
         val longer = material().copy(
             sentences = (0..4).map { index ->
                 BilingualSentence("material-1:$index", "English $index.", null, "中文$index。")
@@ -243,9 +271,115 @@ class MaterialViewModelTest {
         viewModel.selectAndPlaySentence(0)
 
         assertEquals(
-            listOf("English 1.", "中文1。", "English 2.", "中文2。", "English 3.", "中文3。"),
+            listOf("中文0。", "English 1.", "中文1。", "English 2.", "中文2。"),
             speech.preloaded.map { it.text },
         )
+        assertEquals(
+            listOf(
+                SpeechLanguage.MANDARIN_CN,
+                SpeechLanguage.ENGLISH_US,
+                SpeechLanguage.MANDARIN_CN,
+                SpeechLanguage.ENGLISH_US,
+                SpeechLanguage.MANDARIN_CN,
+            ),
+            speech.preloaded.map { it.language },
+        )
+    }
+
+    @Test
+    fun preloadWindowIsClippedAtArticleEnd() {
+        val longer = material().copy(
+            sentences = (0..4).map { index ->
+                BilingualSentence("material-1:$index", "English $index.", null, "中文$index。")
+            },
+        )
+        repository.replaceWith(longer)
+        viewModel.reloadMaterials()
+        viewModel.openMaterial("material-1")
+
+        viewModel.selectAndPlaySentence(4)
+
+        assertEquals(listOf("中文4。"), speech.preloaded.map { it.text })
+    }
+
+    @Test
+    fun preloadWindowSkipsBlankTranslationsAndManualArticleTranslations() {
+        val aiMaterial = material().copy(
+            sentences = listOf(
+                BilingualSentence("material-1:0", "English 0.", null, " "),
+                BilingualSentence("material-1:1", "English 1.", null, null),
+                BilingualSentence("material-1:2", "English 2.", null, "中文2。"),
+            ),
+        )
+        repository.replaceWith(aiMaterial)
+        viewModel.reloadMaterials()
+        viewModel.openMaterial("material-1")
+
+        viewModel.selectAndPlaySentence(0)
+
+        assertEquals(
+            listOf("English 1.", "English 2.", "中文2。"),
+            speech.preloaded.map { it.text },
+        )
+
+        speech.preloaded.clear()
+        val manual = aiMaterial.copy(origin = ArticleOrigin.MANUAL_PASTE)
+        repository.replaceWith(manual)
+        viewModel.reloadMaterials()
+        viewModel.openMaterial("material-1")
+
+        viewModel.selectAndPlaySentence(0)
+
+        assertEquals(listOf("English 1.", "English 2."), speech.preloaded.map { it.text })
+    }
+
+    @Test
+    fun onePreloadFailureDoesNotCancelTheRestOrShowPlaybackError() {
+        val longer = material().copy(
+            sentences = (0..2).map { index ->
+                BilingualSentence("material-1:$index", "English $index.", null, "中文$index。")
+            },
+        )
+        repository.replaceWith(longer)
+        speech.preloadReturnsFalse += "English 1."
+        speech.preloadThrows += "中文1。"
+        viewModel.reloadMaterials()
+        viewModel.openMaterial("material-1")
+
+        viewModel.selectAndPlaySentence(0)
+
+        assertEquals(
+            listOf("中文0。", "English 1.", "中文1。", "English 2.", "中文2。"),
+            speech.preloaded.map { it.text },
+        )
+        assertEquals(PlaybackStatus.PREPARING, viewModel.uiState.value.playbackStatus)
+        assertEquals(null, viewModel.uiState.value.userMessage)
+    }
+
+    @Test
+    fun overlappingPreloadWindowsShareFourRequestConcurrencyLimit() {
+        val longer = material().copy(
+            sentences = (0..4).map { index ->
+                BilingualSentence("material-1:$index", "English $index.", null, "中文$index。")
+            },
+        )
+        repository.replaceWith(longer)
+        speech.holdPreloads = true
+        viewModel.reloadMaterials()
+        viewModel.openMaterial("material-1")
+
+        viewModel.selectAndPlaySentence(0)
+        viewModel.nextSentence()
+
+        assertEquals(4, speech.activePreloads)
+        assertEquals(4, speech.maxActivePreloads)
+        assertEquals(4, speech.preloaded.size)
+
+        speech.releasePreloads()
+        mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(4, speech.maxActivePreloads)
+        assertTrue(speech.preloaded.size > 4)
     }
 
     @Test
@@ -394,22 +528,19 @@ private class FakeMaterialRepository(
 private class FakeLearnerPreferences : LearnerPreferences {
     private var profile = LearnerProfile()
     var libraryLanguage = MaterialLanguage.ENGLISH
-    private val speeds = mutableMapOf(
-        SpeechLanguage.ENGLISH_US to 0.9f,
-        SpeechLanguage.CANTONESE_HK to 0.8f,
-        SpeechLanguage.MANDARIN_CN to 1.0f,
-    )
+    private val mutableSpeeds = MutableStateFlow(SpeechSpeedPreferences())
+    override val speechSpeeds: StateFlow<SpeechSpeedPreferences> = mutableSpeeds
     override fun learnerProfile(): LearnerProfile = profile
-    override fun setEnglishListening(band: Float) {
-        profile = profile.copy(englishListening = band)
+    override fun setListeningBand(band: Float) {
+        profile = profile.copy(listeningBand = band)
     }
     override fun articleLibraryLanguage(): MaterialLanguage = libraryLanguage
     override fun setArticleLibraryLanguage(language: MaterialLanguage) {
         libraryLanguage = language
     }
-    override fun speechSpeed(language: SpeechLanguage): Float = speeds.getValue(language)
+    override fun speechSpeed(language: SpeechLanguage): Float = mutableSpeeds.value.forLanguage(language)
     override fun setSpeechSpeed(language: SpeechLanguage, speed: Float) {
-        speeds[language] = speed.coerceIn(0.5f, 2.0f)
+        mutableSpeeds.value = mutableSpeeds.value.withSpeed(language, speed.coerceIn(0.5f, 2.0f))
     }
 }
 
@@ -453,6 +584,12 @@ private class FakeMaterialSpeechController : SpeechController {
     val spoken = mutableListOf<MaterialSpokenRequest>()
     val previewed = mutableListOf<MaterialPreviewRequest>()
     val preloaded = mutableListOf<MaterialPreloadRequest>()
+    val preloadReturnsFalse = mutableSetOf<String>()
+    val preloadThrows = mutableSetOf<String>()
+    var holdPreloads = false
+    var activePreloads = 0
+    var maxActivePreloads = 0
+    private val preloadRelease = CompletableDeferred<Unit>()
     val availability = SpeechLanguage.entries.associateWith { TtsAvailability.READY }.toMutableMap()
 
     override fun checkAvailability(language: SpeechLanguage): TtsAvailability = availability.getValue(language)
@@ -478,12 +615,23 @@ private class FakeMaterialSpeechController : SpeechController {
     }
     override suspend fun preload(text: String, language: SpeechLanguage, speed: Float): Boolean {
         preloaded += MaterialPreloadRequest(text, language, speed)
-        return true
+        activePreloads++
+        maxActivePreloads = maxOf(maxActivePreloads, activePreloads)
+        return try {
+            if (holdPreloads) preloadRelease.await()
+            if (text in preloadThrows) error("Synthetic preload failure for $text")
+            text !in preloadReturnsFalse
+        } finally {
+            activePreloads--
+        }
     }
     override fun stop() = Unit
     override fun shutdown() = Unit
     suspend fun emit(event: SpeechEvent) {
         mutableEvents.emit(event)
+    }
+    fun releasePreloads() {
+        preloadRelease.complete(Unit)
     }
 }
 

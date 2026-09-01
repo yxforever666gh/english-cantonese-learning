@@ -6,34 +6,76 @@ import com.example.englishcantoneselearning.model.LearnerProfile
 import com.example.englishcantoneselearning.model.MaterialLanguage
 import com.example.englishcantoneselearning.model.MaterialLevelRules
 import com.example.englishcantoneselearning.model.SpeechLanguage
+import kotlin.math.roundToInt
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
+data class SpeechSpeedPreferences(
+    val english: Float = DEFAULT_SPEECH_SPEED,
+    val cantonese: Float = DEFAULT_SPEECH_SPEED,
+    val mandarin: Float = DEFAULT_SPEECH_SPEED,
+) {
+    fun forLanguage(language: SpeechLanguage): Float = when (language) {
+        SpeechLanguage.ENGLISH_US -> english
+        SpeechLanguage.CANTONESE_HK -> cantonese
+        SpeechLanguage.MANDARIN_CN -> mandarin
+    }
+
+    fun withSpeed(language: SpeechLanguage, speed: Float): SpeechSpeedPreferences = when (language) {
+        SpeechLanguage.ENGLISH_US -> copy(english = speed)
+        SpeechLanguage.CANTONESE_HK -> copy(cantonese = speed)
+        SpeechLanguage.MANDARIN_CN -> copy(mandarin = speed)
+    }
+}
+
+const val DEFAULT_SPEECH_SPEED = 0.8f
 
 interface LearnerPreferences {
     fun learnerProfile(): LearnerProfile
-    fun setEnglishListening(band: Float)
+    fun setListeningBand(band: Float)
+    @Deprecated("Use setListeningBand")
+    fun setEnglishListening(band: Float): Unit = setListeningBand(band)
     fun articleLibraryLanguage(): MaterialLanguage
     fun setArticleLibraryLanguage(language: MaterialLanguage)
+    val speechSpeeds: StateFlow<SpeechSpeedPreferences>
+        get() = MutableStateFlow(
+            SpeechSpeedPreferences(
+                english = speechSpeed(SpeechLanguage.ENGLISH_US),
+                cantonese = speechSpeed(SpeechLanguage.CANTONESE_HK),
+                mandarin = speechSpeed(SpeechLanguage.MANDARIN_CN),
+            ),
+        )
     fun speechSpeed(language: SpeechLanguage): Float
     fun setSpeechSpeed(language: SpeechLanguage, speed: Float)
 }
 
 class UserPreferences(context: Context) : LearnerPreferences {
     private val preferences = context.applicationContext.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+    private val mutableSpeechSpeeds: MutableStateFlow<SpeechSpeedPreferences>
+    override val speechSpeeds: StateFlow<SpeechSpeedPreferences>
+        get() = mutableSpeechSpeeds.asStateFlow()
 
     init {
-        preferences.edit {
+        preferences.edit(commit = true) {
             remove(ENGLISH_SPEAKING)
             remove(ENGLISH_WRITING)
             remove(ENGLISH_READING)
+            if (!preferences.getBoolean(SPEECH_SPEED_DEFAULTS_MIGRATED, false)) {
+                SpeechLanguage.entries.forEach { language ->
+                    putFloat(speedKey(language), DEFAULT_SPEECH_SPEED)
+                }
+                putBoolean(SPEECH_SPEED_DEFAULTS_MIGRATED, true)
+            }
         }
+        mutableSpeechSpeeds = MutableStateFlow(readSpeechSpeeds())
     }
 
     override fun learnerProfile(): LearnerProfile = LearnerProfile(
-        englishListening = MaterialLevelRules.normalizeListeningBand(
-            preferences.getFloat(ENGLISH_LISTENING, 6.0f),
-        ),
+        MaterialLevelRules.normalizeListeningBand(preferences.getFloat(ENGLISH_LISTENING, 6.0f)),
     )
 
-    override fun setEnglishListening(band: Float) {
+    override fun setListeningBand(band: Float) {
         preferences.edit { putFloat(ENGLISH_LISTENING, MaterialLevelRules.normalizeListeningBand(band)) }
     }
 
@@ -48,21 +90,25 @@ class UserPreferences(context: Context) : LearnerPreferences {
         preferences.edit { putString(ARTICLE_LIBRARY_LANGUAGE, language.name) }
     }
 
-    override fun speechSpeed(language: SpeechLanguage): Float = preferences.getFloat(
-        speedKey(language),
-        when (language) {
-            SpeechLanguage.ENGLISH_US -> 0.9f
-            SpeechLanguage.CANTONESE_HK -> 0.8f
-            SpeechLanguage.MANDARIN_CN -> 1.0f
-        },
-    )
+    override fun speechSpeed(language: SpeechLanguage): Float = speechSpeeds.value.forLanguage(language)
 
     override fun setSpeechSpeed(language: SpeechLanguage, speed: Float) {
-        val normalized = (speed.coerceIn(0.5f, 2.0f) * 10).toInt() / 10f
+        val normalized = normalizeSpeechSpeed(speed)
         preferences.edit { putFloat(speedKey(language), normalized) }
+        mutableSpeechSpeeds.value = mutableSpeechSpeeds.value.withSpeed(language, normalized)
     }
 
     private fun speedKey(language: SpeechLanguage): String = "speech_speed_${language.name.lowercase()}"
+
+    private fun readSpeechSpeeds(): SpeechSpeedPreferences = SpeechSpeedPreferences(
+        english = readSpeechSpeed(SpeechLanguage.ENGLISH_US),
+        cantonese = readSpeechSpeed(SpeechLanguage.CANTONESE_HK),
+        mandarin = readSpeechSpeed(SpeechLanguage.MANDARIN_CN),
+    )
+
+    private fun readSpeechSpeed(language: SpeechLanguage): Float = normalizeSpeechSpeed(
+        preferences.getFloat(speedKey(language), DEFAULT_SPEECH_SPEED),
+    )
 
     private companion object {
         const val PREFERENCES = "learner_preferences"
@@ -71,5 +117,11 @@ class UserPreferences(context: Context) : LearnerPreferences {
         const val ENGLISH_WRITING = "english_writing"
         const val ENGLISH_READING = "english_reading"
         const val ARTICLE_LIBRARY_LANGUAGE = "article_library_language"
+        const val SPEECH_SPEED_DEFAULTS_MIGRATED = "speech_speed_defaults_migrated_v2"
     }
+}
+
+private fun normalizeSpeechSpeed(speed: Float): Float {
+    if (!speed.isFinite()) return DEFAULT_SPEECH_SPEED
+    return (speed.coerceIn(0.5f, 2.0f) * 10).roundToInt() / 10f
 }

@@ -49,4 +49,13 @@ object MaterialLevelRules {
         in 7.5f..8f -> "B2+/C1: use precise natural language and moderately complex ideas, but never exceed the short-sentence limit."
         else -> "C1+: use advanced natural vocabulary and nuanced ideas, but never exceed the short-sentence limit."
     }
+
+    fun cantoneseGuidance(band: Float): String = when (normalizeListeningBand(band)) {
+        in 1f..3.5f -> "Foundation: use very common Hong Kong daily expressions, direct clauses, and one concrete fact per sentence."
+        in 4f..5f -> "Developing: use familiar colloquial vocabulary and at most one simple subordinate clause per sentence."
+        in 5.5f..6f -> "Intermediate: use mostly high-frequency colloquial vocabulary, no nested clauses, and explain necessary topic terms through context."
+        in 6.5f..7f -> "Upper-intermediate: allow broader natural Hong Kong vocabulary and moderately detailed ideas while keeping sentences short."
+        in 7.5f..8f -> "Advanced: use precise idiomatic Cantonese and moderately complex ideas, but keep every sentence within the short-sentence limit."
+        else -> "Highly advanced: use nuanced, idiomatic Hong Kong Cantonese without Mandarin-style wording, while respecting the short-sentence limit."
+    }
 }

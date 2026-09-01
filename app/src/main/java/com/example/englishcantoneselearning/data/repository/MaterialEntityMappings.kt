@@ -32,6 +32,7 @@ internal fun PracticeMaterial.toMaterialEntity(): MaterialEntity = MaterialEntit
     requestFingerprint = this@toMaterialEntity.requestFingerprint
     origin = this@toMaterialEntity.origin.name
     sectionsJson = MaterialJsonCodec.encodeSections(sections)
+    listeningBand = this@toMaterialEntity.listeningBand
 }
 
 internal fun MaterialEntity.toPracticeMaterial(): PracticeMaterial = PracticeMaterial(
@@ -55,6 +56,7 @@ internal fun MaterialEntity.toPracticeMaterial(): PracticeMaterial = PracticeMat
     requestFingerprint = requestFingerprint,
     origin = runCatching { enumValueOf<ArticleOrigin>(origin) }.getOrDefault(ArticleOrigin.AI_GENERATED),
     sections = MaterialJsonCodec.decodeSections(sectionsJson),
+    listeningBand = listeningBand,
 )
 
 internal fun MaterialPlaybackProgress.toPlaybackProgressEntity() = MaterialPlaybackProgressEntity().also { entity ->

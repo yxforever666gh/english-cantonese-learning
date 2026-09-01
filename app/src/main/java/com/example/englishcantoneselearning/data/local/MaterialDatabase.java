@@ -9,7 +9,7 @@ import androidx.room.RoomDatabase;
         MaterialPlaybackProgressEntity.class,
         MaterialDraftEntity.class
     },
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 public abstract class MaterialDatabase extends RoomDatabase {

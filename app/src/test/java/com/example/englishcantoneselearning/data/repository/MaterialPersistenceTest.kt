@@ -43,11 +43,18 @@ class MaterialPersistenceTest {
             inputTokens = 12,
             outputTokens = 34,
             requestFingerprint = "fingerprint",
-            origin = ArticleOrigin.MANUAL_PASTE,
+            origin = ArticleOrigin.AI_GENERATED,
             sections = listOf(MaterialSection("section-1", "第一節", 0)),
+            listeningBand = 7.5f,
         )
 
         assertEquals(material, material.toMaterialEntity().toPracticeMaterial())
+
+        val manualMaterial = material.copy(
+            origin = ArticleOrigin.MANUAL_PASTE,
+            listeningBand = null,
+        )
+        assertEquals(manualMaterial, manualMaterial.toMaterialEntity().toPracticeMaterial())
     }
 
     @Test
@@ -81,13 +88,31 @@ class MaterialPersistenceTest {
             language = MaterialLanguage.ENGLISH,
             difficulty = Difficulty.TARGET,
             topic = MaterialTopic.TECHNOLOGY,
-            profile = LearnerProfile(7.5f, "B1 中級"),
+            profile = LearnerProfile(listeningBand = 7.5f),
             excludedSourceUrls = listOf("https://example.com/old"),
             currentDate = "2026-08-29",
             sourceSnapshot = snapshot,
         )
 
         assertEquals(request, MaterialDraftCodec.decodeRequest(MaterialDraftCodec.encodeRequest(request)))
+    }
+
+    @Test
+    fun legacyDraftConvertsDifficultyOffsetAndResumesAsTarget() {
+        val legacyJson = """{
+            "language":"CANTONESE",
+            "difficulty":"CHALLENGE",
+            "topic":"CULTURE",
+            "englishListening":8.76,
+            "cantoneseLevel":"B1 中級",
+            "excludedSourceUrls":[],
+            "currentDate":"2026-08-29"
+        }""".trimIndent()
+
+        val restored = MaterialDraftCodec.decodeRequest(legacyJson)
+
+        assertEquals(Difficulty.TARGET, restored.difficulty)
+        assertEquals(9f, restored.profile.listeningBand)
     }
 
     @Test

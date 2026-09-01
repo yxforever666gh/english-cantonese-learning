@@ -1,6 +1,10 @@
 package com.example.englishcantoneselearning.ui
 
+import com.example.englishcantoneselearning.data.preferences.LearnerPreferences
+import com.example.englishcantoneselearning.data.preferences.SpeechSpeedPreferences
+import com.example.englishcantoneselearning.model.LearnerProfile
 import com.example.englishcantoneselearning.model.LearningLanguage
+import com.example.englishcantoneselearning.model.MaterialLanguage
 import com.example.englishcantoneselearning.model.PlaybackMode
 import com.example.englishcantoneselearning.model.PlaybackStatus
 import com.example.englishcantoneselearning.model.SpeechLanguage
@@ -8,7 +12,9 @@ import com.example.englishcantoneselearning.model.TtsAvailability
 import com.example.englishcantoneselearning.speech.SpeechController
 import com.example.englishcantoneselearning.speech.SpeechEvent
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -132,9 +138,72 @@ class ReaderViewModelTest {
         assertFalse(viewModel.uiState.value.userMessage.isNullOrBlank())
     }
 
+    @Test
+    fun languageSpeedsAreIndependentAndDefaultToPointEight() {
+        assertEquals(0.8f, viewModel.uiState.value.speed)
+
+        viewModel.onSpeedChange(1.2f)
+        viewModel.onLanguageChange(LearningLanguage.CANTONESE)
+        assertEquals(0.8f, viewModel.uiState.value.speed)
+
+        viewModel.onSpeedChange(0.6f)
+        viewModel.onLanguageChange(LearningLanguage.ENGLISH)
+        assertEquals(1.2f, viewModel.uiState.value.speed)
+    }
+
+    @Test
+    fun sharedPreferencesSynchronizeSpeedAcrossReaderInstances() = runTest {
+        val preferences = FakeLearnerPreferences()
+        val first = ReaderViewModel(FakeSpeechController(), userPreferences = preferences)
+        val second = ReaderViewModel(FakeSpeechController(), userPreferences = preferences)
+
+        first.onSpeedChange(1.4f)
+
+        assertEquals(1.4f, second.uiState.value.speed)
+        assertEquals(1.4f, preferences.speechSpeed(SpeechLanguage.ENGLISH_US))
+    }
+
+    @Test
+    fun finishingSpeedChangeRestartsPlayingSentenceFromBeginning() {
+        prepare("Read this sentence.")
+        viewModel.playOrPause()
+
+        viewModel.onSpeedChange(1.3f)
+        viewModel.onSpeedChangeFinished()
+
+        assertEquals(2, speechController.spoken.size)
+        assertEquals(1.3f, speechController.spoken.last().speed)
+        assertEquals(0, speechController.spoken.last().startOffset)
+    }
+
     private fun prepare(text: String) {
         viewModel.onArticleTextChange(text)
         viewModel.segmentArticle()
+    }
+}
+
+private class FakeLearnerPreferences : LearnerPreferences {
+    private val mutableSpeeds = MutableStateFlow(SpeechSpeedPreferences())
+    override val speechSpeeds: StateFlow<SpeechSpeedPreferences> = mutableSpeeds
+    private var band = 6.0f
+    private var libraryLanguage = MaterialLanguage.ENGLISH
+
+    override fun learnerProfile() = LearnerProfile(band)
+
+    override fun setListeningBand(band: Float) {
+        this.band = band
+    }
+
+    override fun articleLibraryLanguage(): MaterialLanguage = libraryLanguage
+
+    override fun setArticleLibraryLanguage(language: MaterialLanguage) {
+        libraryLanguage = language
+    }
+
+    override fun speechSpeed(language: SpeechLanguage): Float = mutableSpeeds.value.forLanguage(language)
+
+    override fun setSpeechSpeed(language: SpeechLanguage, speed: Float) {
+        mutableSpeeds.value = mutableSpeeds.value.withSpeed(language, speed)
     }
 }
 

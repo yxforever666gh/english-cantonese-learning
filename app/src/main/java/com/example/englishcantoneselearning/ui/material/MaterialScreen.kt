@@ -79,6 +79,8 @@ fun MaterialScreen(
                     MaterialPlayerPanel(
                         state = state,
                         onPlaybackModeChange = viewModel::setPlaybackMode,
+                        onSpeedChange = viewModel::setSpeechSpeed,
+                        onSpeedChangeFinished = viewModel::onSpeechSpeedChangeFinished,
                         onPrevious = viewModel::previousSentence,
                         onPlayPause = viewModel::playOrPause,
                         onNext = viewModel::nextSentence,
@@ -101,7 +103,7 @@ fun MaterialScreen(
                         state = state,
                         modifier = Modifier.editorialContentWidth(),
                         onLanguage = viewModel::setLanguage,
-                        onDifficulty = viewModel::setDifficulty,
+                        onListeningBand = viewModel::setListeningBand,
                         onTopic = viewModel::setTopic,
                         onGenerate = viewModel::generateNewBatch,
                         onCancel = viewModel::cancelGeneration,
@@ -120,6 +122,7 @@ fun MaterialScreen(
                         onCacheSelected = viewModel::cacheSelectedLibraryArticles,
                         onCancelCaching = viewModel::cancelAudioCaching,
                         onDeleteSelected = viewModel::deleteSelectedLibraryArticles,
+                        onCreate = { onNavigate(AppDestination.SMART_MATERIALS) },
                     )
                 }
             } else {

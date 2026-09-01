@@ -10,7 +10,6 @@ import com.example.englishcantoneselearning.data.repository.MaterialRepository
 import com.example.englishcantoneselearning.model.ArticleOrigin
 import com.example.englishcantoneselearning.model.BuiltInMiniMaxVoices
 import com.example.englishcantoneselearning.model.CustomVoiceFavorite
-import com.example.englishcantoneselearning.model.Difficulty
 import com.example.englishcantoneselearning.model.GenerationActivity
 import com.example.englishcantoneselearning.model.MaterialGenerationRequest
 import com.example.englishcantoneselearning.model.MaterialLanguage
@@ -32,13 +31,12 @@ internal class MaterialGenerationCoordinator(
 ) {
     suspend fun generate(
         language: MaterialLanguage,
-        difficulty: Difficulty,
         topic: MaterialTopic,
         onActivity: (GenerationActivity) -> Unit,
     ) = repository.generate(
         MaterialGenerationRequest(
             language = language,
-            difficulty = difficulty,
+            difficulty = com.example.englishcantoneselearning.model.Difficulty.TARGET,
             topic = topic,
             profile = userPreferences.learnerProfile(),
             excludedSourceUrls = repository.recentSourceUrls(20),
@@ -241,6 +239,32 @@ internal object MaterialPlaybackSupport {
         }
     }
 
+    fun preloadWindowEntries(
+        material: PracticeMaterial,
+        currentIndex: Int,
+        speedFor: (SpeechLanguage) -> Float,
+    ): List<SpeechCacheEntry> = buildList {
+        val currentSentence = material.sentences.getOrNull(currentIndex) ?: return@buildList
+        if (material.origin == ArticleOrigin.AI_GENERATED &&
+            currentSentence.simplifiedChinese?.isNotBlank() == true
+        ) {
+            add(
+                SpeechCacheEntry(
+                    text = currentSentence.simplifiedChinese,
+                    language = SpeechLanguage.MANDARIN_CN,
+                    speed = speedFor(SpeechLanguage.MANDARIN_CN),
+                ),
+            )
+        }
+        addAll(
+            cacheEntries(
+                material = material,
+                indices = (currentIndex + 1)..(currentIndex + PRELOAD_AHEAD_SENTENCES),
+                speedFor = speedFor,
+            ),
+        )
+    }
+
     fun previewText(language: SpeechLanguage): String = when (language) {
         SpeechLanguage.ENGLISH_US -> "Welcome. Let's practice listening together."
         SpeechLanguage.CANTONESE_HK -> "你好，我哋一齊練習廣東話聽力。"
@@ -254,4 +278,6 @@ internal object MaterialPlaybackSupport {
     }
 
     fun missingVoiceMessage(): String = "请先在设置中填写MiniMax API Key"
+
+    private const val PRELOAD_AHEAD_SENTENCES = 2
 }

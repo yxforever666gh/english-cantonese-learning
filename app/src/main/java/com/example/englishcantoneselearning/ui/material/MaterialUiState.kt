@@ -1,7 +1,6 @@
 package com.example.englishcantoneselearning.ui.material
 
 import com.example.englishcantoneselearning.model.BilingualPhase
-import com.example.englishcantoneselearning.model.Difficulty
 import com.example.englishcantoneselearning.model.MaterialLanguage
 import com.example.englishcantoneselearning.model.MaterialProviderConfig
 import com.example.englishcantoneselearning.model.MaterialTopic
@@ -30,7 +29,6 @@ data class MaterialUiState(
     val librarySelectedArticleIds: Set<String> = emptySet(),
     val isAudioCaching: Boolean = false,
     val audioCachingProgress: String? = null,
-    val difficulty: Difficulty = Difficulty.TARGET,
     val topic: MaterialTopic = MaterialTopic.RANDOM,
     val isLoading: Boolean = true,
     val isGenerating: Boolean = false,
@@ -46,7 +44,7 @@ data class MaterialUiState(
     val customVoiceFavorites: List<CustomVoiceFavorite> = emptyList(),
     val previewingVoiceId: String? = null,
     val audioCacheBytes: Long = 0,
-    val englishListeningBand: Float = 6.0f,
+    val listeningBand: Float = 6.0f,
     val selectedSentenceIndex: Int = -1,
     val bilingualPhase: BilingualPhase = BilingualPhase.TARGET,
     val characterOffset: Int = 0,
@@ -54,9 +52,9 @@ data class MaterialUiState(
     val playbackMode: PlaybackMode = PlaybackMode.CONTINUOUS,
     val targetAvailability: TtsAvailability = TtsAvailability.INITIALIZING,
     val mandarinAvailability: TtsAvailability = TtsAvailability.INITIALIZING,
-    val englishSpeed: Float = 0.9f,
+    val englishSpeed: Float = 0.8f,
     val cantoneseSpeed: Float = 0.8f,
-    val mandarinSpeed: Float = 1.0f,
+    val mandarinSpeed: Float = 0.8f,
     val generationError: String? = null,
     val userMessage: String? = null,
     val playbackProgress: Map<String, MaterialPlaybackProgress> = emptyMap(),

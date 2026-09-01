@@ -6,9 +6,11 @@ import com.example.englishcantoneselearning.data.network.GeneratedSentence
 import com.example.englishcantoneselearning.data.network.MaterialPromptBuilder
 import com.example.englishcantoneselearning.model.ArticleOrigin
 import com.example.englishcantoneselearning.model.BilingualSentence
+import com.example.englishcantoneselearning.model.Difficulty
 import com.example.englishcantoneselearning.model.LearnerProfile
 import com.example.englishcantoneselearning.model.MaterialGenerationRequest
 import com.example.englishcantoneselearning.model.MaterialLanguage
+import com.example.englishcantoneselearning.model.MaterialLevelRules
 import com.example.englishcantoneselearning.model.MaterialSection
 import com.example.englishcantoneselearning.model.PracticeMaterial
 import com.example.englishcantoneselearning.model.SourceArticleSnapshot
@@ -94,16 +96,19 @@ internal fun DraftAccumulator.toMaterial(request: MaterialGenerationRequest): Pr
         requestFingerprint = fingerprint,
         origin = ArticleOrigin.AI_GENERATED,
         sections = uniqueSections,
+        listeningBand = MaterialLevelRules.normalizeListeningBand(request.profile.listeningBand),
     )
 }
 
 internal object MaterialDraftCodec {
     fun encodeRequest(request: MaterialGenerationRequest): String = JSONObject()
         .put("language", request.language.name)
-        .put("difficulty", request.difficulty.name)
+        .put("difficulty", Difficulty.TARGET.name)
         .put("topic", request.topic.name)
-        .put("englishListening", request.profile.englishListening.toDouble())
-        .put("cantoneseLevel", request.profile.cantoneseLevel)
+        .put(
+            "listeningBand",
+            MaterialLevelRules.normalizeListeningBand(request.profile.listeningBand).toDouble(),
+        )
         .put("excludedSourceUrls", JSONArray(request.excludedSourceUrls))
         .put("currentDate", request.currentDate)
         .put("sourceSnapshot", request.sourceSnapshot?.let(::encodeSnapshot) ?: JSONObject.NULL)
@@ -111,14 +116,22 @@ internal object MaterialDraftCodec {
 
     fun decodeRequest(json: String): MaterialGenerationRequest {
         val value = JSONObject(json)
+        val storedDifficulty = runCatching {
+            enumValueOf<Difficulty>(value.optString("difficulty", Difficulty.TARGET.name))
+        }.getOrDefault(Difficulty.TARGET)
+        val listeningBand = if (value.has("listeningBand")) {
+            MaterialLevelRules.normalizeListeningBand(value.optDouble("listeningBand", 6.0).toFloat())
+        } else {
+            MaterialLevelRules.effectiveListeningBand(
+                value.optDouble("englishListening", 6.0).toFloat(),
+                storedDifficulty,
+            )
+        }
         return MaterialGenerationRequest(
             language = enumValueOf(value.getString("language")),
-            difficulty = enumValueOf(value.getString("difficulty")),
+            difficulty = Difficulty.TARGET,
             topic = enumValueOf(value.getString("topic")),
-            profile = LearnerProfile(
-                englishListening = value.optDouble("englishListening", 6.0).toFloat(),
-                cantoneseLevel = value.optString("cantoneseLevel", "A0/A1 零基础"),
-            ),
+            profile = LearnerProfile(listeningBand = listeningBand),
             excludedSourceUrls = value.optJSONArray("excludedSourceUrls").toStringList(),
             currentDate = value.optString("currentDate"),
             sourceSnapshot = value.optJSONObject("sourceSnapshot")?.let(::decodeSnapshot),

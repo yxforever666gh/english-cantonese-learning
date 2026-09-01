@@ -14,7 +14,6 @@ import com.example.englishcantoneselearning.data.repository.MaterialRepository
 import com.example.englishcantoneselearning.model.BilingualPhase
 import com.example.englishcantoneselearning.model.ArticleOrigin
 import com.example.englishcantoneselearning.model.MaterialPlaybackProgress
-import com.example.englishcantoneselearning.model.Difficulty
 import com.example.englishcantoneselearning.model.MaterialLanguage
 import com.example.englishcantoneselearning.model.MaterialLevelRules
 import com.example.englishcantoneselearning.model.MaterialProviderConfig
@@ -33,11 +32,16 @@ import com.example.englishcantoneselearning.speech.MiniMaxVoiceService
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 
 class MaterialViewModel(
     private val repository: MaterialRepository,
@@ -67,7 +71,7 @@ class MaterialViewModel(
             voiceCatalogFetchedAt = initialVoiceSettings.fetchedAt,
             customVoiceFavorites = initialVoiceSettings.favorites,
             audioCacheBytes = audioCache.sizeBytes(),
-            englishListeningBand = userPreferences.learnerProfile().englishListening,
+            listeningBand = userPreferences.learnerProfile().listeningBand,
             libraryLanguage = userPreferences.articleLibraryLanguage(),
             englishSpeed = userPreferences.speechSpeed(SpeechLanguage.ENGLISH_US),
             cantoneseSpeed = userPreferences.speechSpeed(SpeechLanguage.CANTONESE_HK),
@@ -77,6 +81,7 @@ class MaterialViewModel(
     val uiState: StateFlow<MaterialUiState> = _uiState.asStateFlow()
 
     private val speechRequestIds = AtomicLong(1_000_000_000L)
+    private val preloadSemaphore = Semaphore(MAX_CONCURRENT_PRELOADS)
     private var activeSpeechRequestId: Long? = null
     private var miniMaxTestRequestId: Long? = null
     private var miniMaxPreviewVoiceId: String? = null
@@ -85,6 +90,17 @@ class MaterialViewModel(
 
     init {
         viewModelScope.launch { speechController.events.collect(::handleSpeechEvent) }
+        viewModelScope.launch {
+            userPreferences.speechSpeeds.collect { speeds ->
+                _uiState.update {
+                    it.copy(
+                        englishSpeed = speeds.english,
+                        cantoneseSpeed = speeds.cantonese,
+                        mandarinSpeed = speeds.mandarin,
+                    )
+                }
+            }
+        }
         reloadMaterials()
         refreshTtsAvailability()
         viewModelScope.launch {
@@ -194,14 +210,10 @@ class MaterialViewModel(
         audioCachingJob?.cancel()
     }
 
-    fun setDifficulty(difficulty: Difficulty) {
-        _uiState.update { it.copy(difficulty = difficulty, userMessage = null) }
-    }
-
-    fun setEnglishListeningBand(band: Float) {
+    fun setListeningBand(band: Float) {
         val normalized = MaterialLevelRules.normalizeListeningBand(band)
-        userPreferences.setEnglishListening(normalized)
-        _uiState.update { it.copy(englishListeningBand = normalized, userMessage = null) }
+        userPreferences.setListeningBand(normalized)
+        _uiState.update { it.copy(listeningBand = normalized, userMessage = null) }
     }
 
     fun setTopic(topic: MaterialTopic) {
@@ -218,7 +230,7 @@ class MaterialViewModel(
             _uiState.update { it.copy(isGenerating = true, generationError = null, userMessage = null) }
             runCatching {
                 val current = _uiState.value
-                generationCoordinator.generate(current.language, current.difficulty, current.topic) { activity ->
+                generationCoordinator.generate(current.language, current.topic) { activity ->
                     _uiState.update { it.copy(generationActivity = activity) }
                 }
             }.onSuccess { generated ->
@@ -607,6 +619,27 @@ class MaterialViewModel(
         }
     }
 
+    fun onSpeechSpeedChangeFinished(language: SpeechLanguage) {
+        val state = _uiState.value
+        val material = state.selectedMaterial ?: return
+        val index = state.selectedSentenceIndex
+        if (index !in material.sentences.indices) return
+        val activeLanguage = if (state.bilingualPhase == BilingualPhase.TARGET) {
+            material.language.toSpeechLanguage()
+        } else {
+            SpeechLanguage.MANDARIN_CN
+        }
+        if (activeLanguage == language && state.playbackStatus in setOf(
+                PlaybackStatus.PLAYING,
+                PlaybackStatus.PREPARING,
+            )
+        ) {
+            startSpeaking(index, state.bilingualPhase, 0)
+        } else {
+            preloadUpcomingSentences(material, index)
+        }
+    }
+
     fun refreshTtsAvailability() {
         val targetLanguage = (_uiState.value.selectedMaterial?.language ?: _uiState.value.language).toSpeechLanguage()
         _uiState.update {
@@ -726,12 +759,24 @@ class MaterialViewModel(
         material: com.example.englishcantoneselearning.model.PracticeMaterial,
         currentIndex: Int,
     ) {
-        val nextIndices = ((currentIndex + 1)..(currentIndex + DEFAULT_PRELOAD_SENTENCES))
-            .filter { it in material.sentences.indices }
-        val entries = MaterialPlaybackSupport.cacheEntries(material, nextIndices, ::speedFor)
+        val entries = MaterialPlaybackSupport.preloadWindowEntries(material, currentIndex, ::speedFor)
         if (entries.isEmpty()) return
         viewModelScope.launch {
-            entries.forEach { speechController.preload(it.text, it.language, it.speed) }
+            supervisorScope {
+                entries.map { entry ->
+                    async {
+                        preloadSemaphore.withPermit {
+                            try {
+                                speechController.preload(entry.text, entry.language, entry.speed)
+                            } catch (error: CancellationException) {
+                                throw error
+                            } catch (_: Throwable) {
+                                false
+                            }
+                        }
+                    }
+                }.awaitAll()
+            }
             _uiState.update { it.copy(audioCacheBytes = audioCache.sizeBytes()) }
         }
     }
@@ -908,6 +953,6 @@ class MaterialViewModel(
 
     private companion object {
         const val VOICE_CATALOG_MAX_AGE_MS = 24L * 60L * 60L * 1_000L
-        const val DEFAULT_PRELOAD_SENTENCES = 3
+        const val MAX_CONCURRENT_PRELOADS = 4
     }
 }

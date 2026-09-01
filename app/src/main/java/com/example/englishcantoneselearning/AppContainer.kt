@@ -12,6 +12,8 @@ import com.example.englishcantoneselearning.data.preferences.UserPreferences
 import com.example.englishcantoneselearning.data.repository.DefaultMaterialRepository
 import com.example.englishcantoneselearning.data.repository.MaterialRepository
 import com.example.englishcantoneselearning.data.source.FixedArticleSourceRepository
+import com.example.englishcantoneselearning.model.Difficulty
+import com.example.englishcantoneselearning.model.MaterialLevelRules
 import com.example.englishcantoneselearning.data.security.SecureApiKeyStore
 import com.example.englishcantoneselearning.speech.AudioCache
 import com.example.englishcantoneselearning.speech.CloudSpeechController
@@ -23,6 +25,7 @@ import okhttp3.OkHttpClient
 
 class AppContainer(context: Context) {
     private val appContext = context.applicationContext
+    val userPreferences = UserPreferences(appContext)
     private val database = Room.databaseBuilder(
         appContext,
         MaterialDatabase::class.java,
@@ -30,12 +33,15 @@ class AppContainer(context: Context) {
     )
         // Never add fallbackToDestructiveMigration here: a missing migration must fail safely
         // instead of silently deleting the learner's saved materials.
-        .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+        .addMigrations(
+            MIGRATION_1_2,
+            MIGRATION_2_3,
+            migration3To4(userPreferences.learnerProfile().listeningBand),
+        )
         .build()
 
     private val legacyApiKeyStore = SecureApiKeyStore(appContext)
     val serviceConfigStore = ServiceConfigStore(appContext, legacyApiKeyStore)
-    val userPreferences = UserPreferences(appContext)
     val audioCache = AudioCache(appContext)
     val miniMaxSpeechGateway = MiniMaxSpeechGateway()
     val miniMaxVoiceGateway = MiniMaxVoiceGateway()
@@ -108,6 +114,29 @@ class AppContainer(context: Context) {
                     )""".trimIndent(),
                 )
             }
+        }
+    }
+}
+
+internal fun migration3To4(currentListeningBand: Float): Migration {
+    val targetBand = MaterialLevelRules.normalizeListeningBand(currentListeningBand)
+    val easyBand = MaterialLevelRules.effectiveListeningBand(targetBand, Difficulty.EASY)
+    val challengeBand = MaterialLevelRules.effectiveListeningBand(targetBand, Difficulty.CHALLENGE)
+    return object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE practice_materials ADD COLUMN listeningBand REAL")
+            db.execSQL(
+                """UPDATE practice_materials
+                    SET listeningBand = CASE difficulty
+                        WHEN 'EASY' THEN ?
+                        WHEN 'CHALLENGE' THEN ?
+                        ELSE ?
+                    END
+                    WHERE origin = 'AI_GENERATED'
+                      AND language IN ('ENGLISH', 'CANTONESE')
+                """.trimIndent(),
+                arrayOf(easyBand, challengeBand, targetBand),
+            )
         }
     }
 }

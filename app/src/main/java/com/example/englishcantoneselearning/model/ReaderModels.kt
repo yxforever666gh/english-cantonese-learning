@@ -39,7 +39,7 @@ data class ReaderUiState(
     val characterOffset: Int = 0,
     val playbackMode: PlaybackMode = PlaybackMode.CONTINUOUS,
     val playbackStatus: PlaybackStatus = PlaybackStatus.IDLE,
-    val speed: Float = 1.0f,
+    val speed: Float = 0.8f,
     val ttsAvailability: TtsAvailability = TtsAvailability.INITIALIZING,
     val userMessage: String? = null,
 )

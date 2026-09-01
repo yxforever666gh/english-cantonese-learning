@@ -17,9 +17,9 @@ class MaterialPromptBuilderTest {
     fun promptContainsVersionProfileLengthAndExclusions() {
         val prompt = MaterialPromptBuilder.input(request())
 
-        assertTrue(prompt.contains("listening-material-v6-source-adaptation"))
+        assertTrue(prompt.contains("listening-material-v7-global-ielts"))
         assertTrue(prompt.contains("IELTS listening 6.0"))
-        assertTrue(prompt.contains("Effective level for this TARGET request: IELTS listening 6.0"))
+        assertTrue(prompt.contains("Difficulty: TARGET"))
         assertTrue(prompt.contains("B1+"))
         assertTrue(prompt.contains("12-30 sentence pairs"))
         assertTrue(prompt.contains("EACH target sentence must contain 13-15 English words"))
@@ -33,14 +33,18 @@ class MaterialPromptBuilderTest {
     }
 
     @Test
-    fun cantoneseRulesUseJyutpingAndBeginnerLengths() {
+    fun cantoneseRulesUseTheSameIeltsBandAndFixedTargetLengths() {
         val request = request(language = MaterialLanguage.CANTONESE, difficulty = Difficulty.EASY)
 
         assertEquals(
-            "12-30 sentence pairs in this chapter; EACH target sentence must contain 6-8 Chinese Han characters. The finished article must contain at least 20 sentence pairs, but has no total word-duration target. Split longer clauses at commas or natural semantic boundaries and give every part its own Simplified Chinese translation.",
+            "12-30 sentence pairs in this chapter; EACH target sentence must contain 8-10 Chinese Han characters. The finished article must contain at least 20 sentence pairs, but has no total word-duration target. Split longer clauses at commas or natural semantic boundaries and give every part its own Simplified Chinese translation.",
             MaterialPromptBuilder.lengthRule(request.language, request.difficulty),
         )
-        assertTrue(MaterialPromptBuilder.input(request).contains("jyutping must be non-empty"))
+        val prompt = MaterialPromptBuilder.input(request)
+        assertTrue(prompt.contains("IELTS listening 6.0 as the Cantonese complexity scale"))
+        assertTrue(prompt.contains("Intermediate:"))
+        assertTrue(prompt.contains("Difficulty: TARGET"))
+        assertTrue(prompt.contains("jyutping must be non-empty"))
     }
 
     @Test
@@ -61,7 +65,11 @@ class MaterialPromptBuilderTest {
         )
         assertNotEquals(
             MaterialPromptBuilder.fingerprint(first),
-            MaterialPromptBuilder.fingerprint(first.copy(profile = LearnerProfile(englishListening = 6.5f))),
+            MaterialPromptBuilder.fingerprint(first.copy(profile = LearnerProfile(listeningBand = 6.5f))),
+        )
+        assertEquals(
+            MaterialPromptBuilder.fingerprint(first),
+            MaterialPromptBuilder.fingerprint(first.copy(difficulty = Difficulty.CHALLENGE)),
         )
     }
 
