@@ -1,17 +1,14 @@
 package com.example.englishcantoneselearning.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -32,14 +29,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.example.englishcantoneselearning.R
 import com.example.englishcantoneselearning.ui.theme.EditorialInk
 import com.example.englishcantoneselearning.ui.theme.EditorialMint
 import com.example.englishcantoneselearning.ui.theme.EditorialPine
-import com.example.englishcantoneselearning.ui.theme.EditorialSurface
 import com.example.englishcantoneselearning.model.LearningLanguage
 import com.example.englishcantoneselearning.model.ReaderUiState
 import com.example.englishcantoneselearning.model.SentenceItem
@@ -140,6 +136,7 @@ internal fun SentenceCard(
     sentence: SentenceItem,
     selected: Boolean,
     playing: Boolean,
+    readingFontSizeSp: Int,
     canMerge: Boolean,
     onPlay: () -> Unit,
     onEdit: () -> Unit,
@@ -154,67 +151,62 @@ internal fun SentenceCard(
         color = if (selected) EditorialMint else Color.Transparent,
         shape = RoundedCornerShape(12.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(start = 8.dp, top = 11.dp, bottom = 11.dp, end = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 10.dp, end = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            Box(
-                Modifier
-                    .width(4.dp)
-                    .heightIn(min = 48.dp)
-                    .background(if (selected) EditorialPine else Color.Transparent, RoundedCornerShape(999.dp)),
-            )
-            Spacer(Modifier.size(10.dp))
-            Surface(
-                modifier = Modifier.size(32.dp),
-                shape = androidx.compose.foundation.shape.CircleShape,
-                color = if (selected) EditorialPine else Color.Transparent,
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(contentAlignment = Alignment.Center) {
+                CompactSentenceNumberBadge(
+                    number = index + 1,
+                    selected = selected,
+                )
+                if (playing) {
                     Text(
-                        text = if (playing) "▶" else "${index + 1}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (selected) Color.White else EditorialPine,
-                        fontWeight = FontWeight.Bold,
+                        text = "正在播放",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = EditorialPine,
+                        modifier = Modifier.padding(start = 8.dp),
                     )
+                }
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                    IconButton(
+                        onClick = { menuExpanded = true },
+                        modifier = Modifier.size(36.dp),
+                    ) {
+                        Icon(painterResource(R.drawable.ic_more_vert), contentDescription = "句子操作")
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("编辑或拆分") },
+                            onClick = {
+                                menuExpanded = false
+                                onEdit()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("与下一句合并") },
+                            enabled = canMerge,
+                            onClick = {
+                                menuExpanded = false
+                                onMerge()
+                            },
+                        )
+                    }
                 }
             }
             Text(
                 text = sentence.text,
-                style = MaterialTheme.typography.bodyLarge,
+                fontSize = readingFontSizeSp.sp,
+                lineHeight = (readingFontSizeSp * 1.5f).sp,
                 color = EditorialInk,
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 12.dp),
+                modifier = Modifier.fillMaxWidth().padding(end = 8.dp),
             )
-            Box {
-                IconButton(
-                    onClick = { menuExpanded = true },
-                    modifier = Modifier.size(40.dp),
-                ) {
-                    Icon(painterResource(R.drawable.ic_more_vert), contentDescription = "句子操作")
-                }
-                DropdownMenu(
-                    expanded = menuExpanded,
-                    onDismissRequest = { menuExpanded = false },
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("编辑或拆分") },
-                        onClick = {
-                            menuExpanded = false
-                            onEdit()
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text("与下一句合并") },
-                        enabled = canMerge,
-                        onClick = {
-                            menuExpanded = false
-                            onMerge()
-                        },
-                    )
-                }
-            }
         }
     }
 }

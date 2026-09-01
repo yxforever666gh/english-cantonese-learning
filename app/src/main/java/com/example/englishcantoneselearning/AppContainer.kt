@@ -7,6 +7,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.englishcantoneselearning.data.local.MaterialDatabase
 import com.example.englishcantoneselearning.data.network.FailoverMaterialGenerator
 import com.example.englishcantoneselearning.data.network.OpenAiResponsesMaterialGateway
+import com.example.englishcantoneselearning.data.network.OpenAiResponsesNewsTranslationGateway
+import com.example.englishcantoneselearning.data.network.FailoverNewsTranslator
+import com.example.englishcantoneselearning.data.news.FileArticleTranslationCache
+import com.example.englishcantoneselearning.data.news.SharedPreferencesTitleTranslationCache
 import com.example.englishcantoneselearning.data.preferences.ServiceConfigStore
 import com.example.englishcantoneselearning.data.preferences.UserPreferences
 import com.example.englishcantoneselearning.data.preferences.EmbeddedAppSeedInstaller
@@ -63,6 +67,10 @@ class AppContainer(context: Context) {
     )
     val materialGateway = OpenAiResponsesMaterialGateway()
     val materialGenerator = FailoverMaterialGenerator(serviceConfigStore, materialGateway)
+    val newsTranslationGateway = OpenAiResponsesNewsTranslationGateway()
+    val newsTranslationService = FailoverNewsTranslator(serviceConfigStore, newsTranslationGateway)
+    val titleTranslationCache = SharedPreferencesTitleTranslationCache(appContext)
+    val articleTranslationCache = FileArticleTranslationCache(appContext)
     val fixedSourceRepository = FixedArticleSourceRepository(
         OkHttpClient.Builder()
             .addInterceptor { chain ->

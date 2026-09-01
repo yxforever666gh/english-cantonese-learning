@@ -100,6 +100,30 @@ class NewsMaterialRepositoryTest {
         assertEquals(1, storage.materials.size)
     }
 
+    @Test
+    fun translatedSaveUpgradesExistingBookmarkWithoutChangingItsIdentity() = runTest {
+        val storage = InMemoryMaterialDao()
+        val repository = DefaultMaterialRepository(storage.dao, UnsupportedGenerator)
+        val sourceTexts = listOf("First sentence.", "Second sentence.", "Third sentence.")
+        val original = repository.saveNewsArticle(
+            snapshot(), MaterialLanguage.ENGLISH, setOf(NewsTag.TECHNOLOGY), sourceTexts,
+        )
+
+        val translated = repository.saveNewsArticle(
+            snapshot = snapshot(),
+            language = MaterialLanguage.ENGLISH,
+            tags = setOf(NewsTag.TECHNOLOGY),
+            sentenceTexts = sourceTexts,
+            sentenceTranslations = listOf("第一句。", "第二句。", "第三句。"),
+        )
+
+        assertEquals(original.id, translated.id)
+        assertEquals("news-import-v2-translated", translated.promptVersion)
+        assertEquals(listOf("第一句。", "第二句。", "第三句。"),
+            translated.sentences.map { it.simplifiedChinese })
+        assertEquals(1, storage.materials.size)
+    }
+
     private fun snapshot() = SourceArticleSnapshot(
         sourceId = "source-1",
         publisher = "Publisher",

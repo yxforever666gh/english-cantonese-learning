@@ -41,6 +41,13 @@ interface MaterialRepository {
         tags: Set<NewsTag>,
         sentenceTexts: List<String>,
     ): PracticeMaterial = error("当前仓库不支持保存新闻文章")
+    suspend fun saveNewsArticle(
+        snapshot: SourceArticleSnapshot,
+        language: MaterialLanguage,
+        tags: Set<NewsTag>,
+        sentenceTexts: List<String>,
+        sentenceTranslations: List<String>,
+    ): PracticeMaterial = saveNewsArticle(snapshot, language, tags, sentenceTexts)
     suspend fun playbackProgress(): Map<String, MaterialPlaybackProgress> = emptyMap()
     suspend fun savePlaybackProgress(progress: MaterialPlaybackProgress) = Unit
     suspend fun clearPlaybackProgress(materialId: String) = Unit
@@ -168,15 +175,42 @@ class DefaultMaterialRepository(
         language: MaterialLanguage,
         tags: Set<NewsTag>,
         sentenceTexts: List<String>,
+    ): PracticeMaterial = saveNewsArticle(snapshot, language, tags, sentenceTexts, emptyList())
+
+    override suspend fun saveNewsArticle(
+        snapshot: SourceArticleSnapshot,
+        language: MaterialLanguage,
+        tags: Set<NewsTag>,
+        sentenceTexts: List<String>,
+        sentenceTranslations: List<String>,
     ): PracticeMaterial = withContext(Dispatchers.IO) {
         require(snapshot.paragraphs.isNotEmpty()) { "新闻正文为空" }
         val originalText = snapshot.paragraphs.joinToString("\n\n") { it.text.trim() }
         require(originalText.isNotBlank()) { "新闻正文为空" }
         val cleanSentences = sentenceTexts.map(String::trim).filter(String::isNotEmpty)
         require(cleanSentences.isNotEmpty()) { "请先完成断句" }
+        val cleanTranslations = sentenceTranslations.map(String::trim)
+        require(cleanTranslations.isEmpty() ||
+            (cleanTranslations.size == cleanSentences.size && cleanTranslations.all(String::isNotEmpty))) {
+            "新闻译文必须与原文逐句完整对应"
+        }
 
         newsSaveMutex.withLock {
-            findExistingNewsMaterial(snapshot)?.let { return@withLock it }
+            findExistingNewsMaterial(snapshot)?.let { existing ->
+                if (cleanTranslations.isNotEmpty() && existing.sentences.size == cleanSentences.size &&
+                    existing.sentences.any { it.simplifiedChinese.isNullOrBlank() }
+                ) {
+                    val updated = existing.copy(
+                        sentences = existing.sentences.mapIndexed { index, sentence ->
+                            sentence.copy(simplifiedChinese = cleanTranslations[index])
+                        },
+                        promptVersion = NEWS_TRANSLATED_IMPORT_VERSION,
+                    )
+                    dao.insert(updated.toMaterialEntity())
+                    return@withLock updated
+                }
+                return@withLock existing
+            }
 
             val materialId = UUID.randomUUID().toString()
             val material = PracticeMaterial(
@@ -190,11 +224,11 @@ class DefaultMaterialRepository(
                 title = snapshot.title.trim().ifBlank { cleanSentences.first().take(30) },
                 targetText = originalText,
                 sentences = cleanSentences.mapIndexed { index, text ->
-                    BilingualSentence("$materialId:$index", text, null, null)
+                    BilingualSentence("$materialId:$index", text, null, cleanTranslations.getOrNull(index))
                 },
                 sources = listOf(snapshot.toSourceReference()),
                 createdAt = System.currentTimeMillis(),
-                promptVersion = NEWS_IMPORT_VERSION,
+                promptVersion = if (cleanTranslations.isEmpty()) NEWS_IMPORT_VERSION else NEWS_TRANSLATED_IMPORT_VERSION,
                 providerName = "新闻导入",
                 model = "",
                 responseId = "",
@@ -288,6 +322,7 @@ class DefaultMaterialRepository(
 
     private companion object {
         const val NEWS_IMPORT_VERSION = "news-import-v1"
+        const val NEWS_TRANSLATED_IMPORT_VERSION = "news-import-v2-translated"
     }
 
 }

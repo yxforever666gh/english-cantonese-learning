@@ -88,6 +88,7 @@ fun LearningApp(
                     onPlaybackModeChange = readerViewModel::onPlaybackModeChange,
                     onSpeedChange = readerViewModel::onSpeedChange,
                     onSpeedChangeFinished = readerViewModel::onSpeedChangeFinished,
+                    onReadingFontSizeChange = readerViewModel::onReadingFontSizeChange,
                     onPlayOrPause = readerViewModel::playOrPause,
                     onPreviousSentence = readerViewModel::previousSentence,
                     onNextSentence = readerViewModel::nextSentence,

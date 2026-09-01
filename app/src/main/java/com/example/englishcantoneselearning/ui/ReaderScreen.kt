@@ -2,7 +2,6 @@ package com.example.englishcantoneselearning.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,7 +10,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -51,6 +49,7 @@ fun ReaderScreen(
     onPlaybackModeChange: (PlaybackMode) -> Unit,
     onSpeedChange: (Float) -> Unit,
     onSpeedChangeFinished: () -> Unit,
+    onReadingFontSizeChange: (Int) -> Unit = {},
     onPlayOrPause: () -> Unit,
     onPreviousSentence: () -> Unit,
     onNextSentence: () -> Unit,
@@ -107,6 +106,7 @@ fun ReaderScreen(
                     onPlaybackModeChange = onPlaybackModeChange,
                     onSpeedChange = onSpeedChange,
                     onSpeedChangeFinished = onSpeedChangeFinished,
+                    onReadingFontSizeChange = onReadingFontSizeChange,
                     onPlayOrPause = onPlayOrPause,
                     onPreviousSentence = onPreviousSentence,
                     onNextSentence = onNextSentence,
@@ -164,6 +164,7 @@ fun ReaderScreen(
                         selected = index == state.selectedIndex,
                         playing = index == state.selectedIndex &&
                             state.playbackStatus in setOf(PlaybackStatus.PLAYING, PlaybackStatus.PREPARING),
+                        readingFontSizeSp = state.readingFontSizeSp,
                         canMerge = index < state.sentences.lastIndex,
                         onPlay = { onSelectSentence(index) },
                         onEdit = { editingSentence = sentence },

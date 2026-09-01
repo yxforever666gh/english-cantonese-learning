@@ -76,6 +76,8 @@ class MaterialViewModel(
             englishSpeed = userPreferences.speechSpeed(SpeechLanguage.ENGLISH_US),
             cantoneseSpeed = userPreferences.speechSpeed(SpeechLanguage.CANTONESE_HK),
             mandarinSpeed = userPreferences.speechSpeed(SpeechLanguage.MANDARIN_CN),
+            showNewsTranslations = userPreferences.showNewsTranslations.value,
+            readingFontSizeSp = userPreferences.readingFontSizeSp.value,
         ),
     )
     val uiState: StateFlow<MaterialUiState> = _uiState.asStateFlow()
@@ -99,6 +101,16 @@ class MaterialViewModel(
                         mandarinSpeed = speeds.mandarin,
                     )
                 }
+            }
+        }
+        viewModelScope.launch {
+            userPreferences.showNewsTranslations.collect { show ->
+                _uiState.update { it.copy(showNewsTranslations = show) }
+            }
+        }
+        viewModelScope.launch {
+            userPreferences.readingFontSizeSp.collect { sizeSp ->
+                _uiState.update { it.copy(readingFontSizeSp = sizeSp) }
             }
         }
         reloadMaterials()
@@ -644,6 +656,36 @@ class MaterialViewModel(
         }
     }
 
+    fun setShowNewsTranslations(show: Boolean) {
+        val state = _uiState.value
+        userPreferences.setShowNewsTranslations(show)
+        if (!show && state.selectedMaterial?.origin == ArticleOrigin.NEWS_FEED &&
+            state.bilingualPhase == BilingualPhase.TRANSLATION &&
+            state.playbackStatus in setOf(PlaybackStatus.PLAYING, PlaybackStatus.PREPARING)
+        ) {
+            val material = state.selectedMaterial ?: return
+            activeSpeechRequestId = null
+            speechController.stop()
+            markSentenceCompleted(material, state.selectedSentenceIndex)
+            val next = state.selectedSentenceIndex + 1
+            if (state.playbackMode == PlaybackMode.CONTINUOUS && next in material.sentences.indices) {
+                startSpeaking(next, BilingualPhase.TARGET, 0)
+            } else {
+                _uiState.update {
+                    it.copy(
+                        playbackStatus = PlaybackStatus.IDLE,
+                        characterOffset = 0,
+                        bilingualPhase = BilingualPhase.TARGET,
+                    )
+                }
+            }
+        }
+    }
+
+    fun setReadingFontSizeSp(sizeSp: Int) {
+        userPreferences.setReadingFontSizeSp(sizeSp)
+    }
+
     fun onSpeechSpeedChangeFinished(language: SpeechLanguage) {
         val state = _uiState.value
         val material = state.selectedMaterial ?: return
@@ -739,7 +781,8 @@ class MaterialViewModel(
         val targetLanguage = material.language.toSpeechLanguage()
         val targetAvailability = speechController.checkAvailability(targetLanguage)
         val mandarinAvailability = speechController.checkAvailability(SpeechLanguage.MANDARIN_CN)
-        val needsTranslation = material.origin == ArticleOrigin.AI_GENERATED &&
+        val needsTranslation = (material.origin == ArticleOrigin.AI_GENERATED ||
+            (material.origin == ArticleOrigin.NEWS_FEED && state.showNewsTranslations)) &&
             material.sentences[index].simplifiedChinese?.isNotBlank() == true
         if (targetAvailability != TtsAvailability.READY ||
             (needsTranslation && mandarinAvailability != TtsAvailability.READY)
@@ -784,7 +827,13 @@ class MaterialViewModel(
         material: com.example.englishcantoneselearning.model.PracticeMaterial,
         currentIndex: Int,
     ) {
-        val entries = MaterialPlaybackSupport.preloadWindowEntries(material, currentIndex, ::speedFor)
+        val entries = MaterialPlaybackSupport.preloadWindowEntries(
+            material,
+            currentIndex,
+            ::speedFor,
+            includeTranslations = material.origin == ArticleOrigin.AI_GENERATED ||
+                (material.origin == ArticleOrigin.NEWS_FEED && _uiState.value.showNewsTranslations),
+        )
         if (entries.isEmpty()) return
         viewModelScope.launch {
             supervisorScope {
@@ -849,7 +898,8 @@ class MaterialViewModel(
                 val state = _uiState.value
                 val material = state.selectedMaterial
                 val sentence = material?.sentences?.getOrNull(state.selectedSentenceIndex)
-                val hasTranslation = material?.origin == ArticleOrigin.AI_GENERATED &&
+                val hasTranslation = (material?.origin == ArticleOrigin.AI_GENERATED ||
+                    (material?.origin == ArticleOrigin.NEWS_FEED && state.showNewsTranslations)) &&
                     sentence?.simplifiedChinese?.isNotBlank() == true
                 if (state.bilingualPhase == BilingualPhase.TARGET && hasTranslation) {
                     startSpeaking(state.selectedSentenceIndex, BilingualPhase.TRANSLATION, 0)

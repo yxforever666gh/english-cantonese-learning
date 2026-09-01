@@ -1,7 +1,6 @@
 package com.example.englishcantoneselearning.ui.material
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
@@ -12,21 +11,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -42,7 +34,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.englishcantoneselearning.R
+import com.example.englishcantoneselearning.data.preferences.MAX_READING_FONT_SIZE_SP
+import com.example.englishcantoneselearning.data.preferences.MIN_READING_FONT_SIZE_SP
 import com.example.englishcantoneselearning.model.BilingualPhase
 import com.example.englishcantoneselearning.model.MaterialLanguage
 import com.example.englishcantoneselearning.model.PlaybackMode
@@ -57,13 +52,14 @@ import com.example.englishcantoneselearning.ui.EditorialPageHeader
 import com.example.englishcantoneselearning.ui.EditorialProgress
 import com.example.englishcantoneselearning.ui.EditorialSectionHeader
 import com.example.englishcantoneselearning.ui.EditorialSegmentedControl
+import com.example.englishcantoneselearning.ui.CollapsiblePlayerSurface
+import com.example.englishcantoneselearning.ui.CompactSentenceNumberBadge
 import com.example.englishcantoneselearning.ui.MetadataPill
+import com.example.englishcantoneselearning.ui.NumericStepper
 import com.example.englishcantoneselearning.ui.theme.EditorialInk
 import com.example.englishcantoneselearning.ui.theme.EditorialMint
 import com.example.englishcantoneselearning.ui.theme.EditorialPine
-import com.example.englishcantoneselearning.ui.theme.EditorialSurface
 import com.example.englishcantoneselearning.ui.theme.EditorialTerracotta
-import java.util.Locale
 
 @Composable
 internal fun MaterialDetail(
@@ -143,37 +139,40 @@ internal fun MaterialDetail(
                     color = if (selected) EditorialMint else Color.Transparent,
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
                 ) {
-                    Row(
-                        Modifier.padding(horizontal = 8.dp, vertical = 14.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    Column(
+                        Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(5.dp),
                     ) {
-                        androidx.compose.foundation.layout.Box(
-                            Modifier
-                                .width(3.dp)
-                                .height(44.dp)
-                                .background(
-                                    if (selected) EditorialPine else Color.Transparent,
-                                    androidx.compose.foundation.shape.RoundedCornerShape(99.dp),
-                                ),
+                        CompactSentenceNumberBadge(
+                            number = index + 1,
+                            selected = selected,
                         )
-                        Text(
-                            text = "${index + 1}",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (selected) EditorialPine else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.width(28.dp).padding(top = 2.dp),
-                        )
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                             Text(
                                 sentence.targetText,
-                                style = MaterialTheme.typography.bodyLarge,
+                                fontSize = state.readingFontSizeSp.sp,
+                                lineHeight = (state.readingFontSizeSp * 1.5f).sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = EditorialInk,
                             )
                             sentence.jyutping?.takeIf { it.isNotBlank() }?.let {
-                                Text(it, color = EditorialTerracotta, style = MaterialTheme.typography.bodyMedium)
+                                Text(
+                                    it,
+                                    color = EditorialTerracotta,
+                                    fontSize = state.readingFontSizeSp.sp,
+                                    lineHeight = (state.readingFontSizeSp * 1.5f).sp,
+                                )
                             }
-                            sentence.simplifiedChinese?.takeIf { it.isNotBlank() }?.let {
-                                Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            sentence.simplifiedChinese?.takeIf {
+                                it.isNotBlank() &&
+                                    (material.origin != ArticleOrigin.NEWS_FEED || state.showNewsTranslations)
+                            }?.let {
+                                Text(
+                                    it,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = state.readingFontSizeSp.sp,
+                                    lineHeight = (state.readingFontSizeSp * 1.5f).sp,
+                                )
                             }
                             if (selected && state.playbackStatus in setOf(PlaybackStatus.PLAYING, PlaybackStatus.PREPARING)) {
                                 Text(
@@ -192,7 +191,6 @@ internal fun MaterialDetail(
                     }
                 }
                 HorizontalDivider(
-                    modifier = Modifier.padding(start = 49.dp),
                     color = MaterialTheme.colorScheme.outlineVariant,
                 )
             }
@@ -246,158 +244,104 @@ internal fun MaterialDetail(
     }
 }
 
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 internal fun MaterialPlayerPanel(
     state: MaterialUiState,
     onPlaybackModeChange: (PlaybackMode) -> Unit,
     onSpeedChange: (SpeechLanguage, Float) -> Unit,
     onSpeedChangeFinished: (SpeechLanguage) -> Unit,
+    onShowNewsTranslations: (Boolean) -> Unit,
+    onReadingFontSizeChange: (Int) -> Unit,
     onPrevious: () -> Unit,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
 ) {
     val material = state.selectedMaterial ?: return
+    val usesTranslation = material.origin == ArticleOrigin.AI_GENERATED ||
+        (material.origin == ArticleOrigin.NEWS_FEED && state.showNewsTranslations &&
+            material.sentences.any { !it.simplifiedChinese.isNullOrBlank() })
     val ready = state.targetAvailability == TtsAvailability.READY &&
-        (material.origin != ArticleOrigin.AI_GENERATED || state.mandarinAvailability == TtsAvailability.READY)
+        (!usesTranslation || state.mandarinAvailability == TtsAvailability.READY)
     val hasSelection = state.selectedSentenceIndex in material.sentences.indices
     val progress = state.playbackProgress[material.id]
     val percent = progress?.percent(material.sentences.size) ?: 0
     val targetLanguage = material.language.toSpeechLanguage()
-    var expanded by rememberSaveable { mutableStateOf(false) }
-
-    if (expanded) {
-        ModalBottomSheet(onDismissRequest = { expanded = false }) {
-            Column(
-                Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                EditorialSectionHeader(
-                    title = "朗读控制",
-                    subtitle = if (hasSelection) {
-                        "第 ${state.selectedSentenceIndex + 1} / ${material.sentences.size} 句 · 已完成 $percent%"
-                    } else {
-                        "选择任一句开始朗读"
-                    },
-                )
-                EditorialProgress(percent / 100f)
-                Text(
-                    if (ready && material.origin != ArticleOrigin.AI_GENERATED) "目标语语音已就绪"
-                    else if (ready) "目标语与普通话语音已就绪" else voiceStatus(state),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (ready) EditorialPine else MaterialTheme.colorScheme.error,
-                )
-                PlayerTransportControls(
-                    playing = state.playbackStatus == PlaybackStatus.PLAYING,
-                    preparing = state.playbackStatus == PlaybackStatus.PREPARING,
-                    canPlay = ready && material.sentences.isNotEmpty(),
-                    hasPrevious = hasSelection && state.selectedSentenceIndex > 0,
-                    hasNext = hasSelection && state.selectedSentenceIndex < material.sentences.lastIndex,
-                    onPrevious = onPrevious,
-                    onPlayPause = onPlayPause,
-                    onNext = onNext,
-                    playTag = "material_sheet_play_pause",
-                )
-                EditorialSegmentedControl(
-                    options = listOf(PlaybackMode.SINGLE to "单组", PlaybackMode.CONTINUOUS to "连续"),
-                    selected = state.playbackMode,
-                    onSelect = onPlaybackModeChange,
-                    optionModifier = { mode -> Modifier.testTag("material_mode_${mode.name.lowercase()}") },
-                )
-                MaterialSpeedSetting(
-                    label = "${MaterialPlaybackSupport.languageName(targetLanguage)}语速",
-                    language = targetLanguage,
-                    value = speechSpeed(state, targetLanguage),
-                    onChange = onSpeedChange,
-                    onChangeFinished = onSpeedChangeFinished,
-                )
-                if (material.origin == ArticleOrigin.AI_GENERATED) {
-                    MaterialSpeedSetting(
-                        label = "中文翻译语速",
-                        language = SpeechLanguage.MANDARIN_CN,
-                        value = speechSpeed(state, SpeechLanguage.MANDARIN_CN),
-                        onChange = onSpeedChange,
-                        onChangeFinished = onSpeedChangeFinished,
-                    )
-                }
-            }
-        }
-    }
-
-    Surface(
+    CollapsiblePlayerSurface(
+        stateKey = material.id,
+        playing = state.playbackStatus == PlaybackStatus.PLAYING,
+        preparing = state.playbackStatus == PlaybackStatus.PREPARING,
+        canPlay = ready && material.sentences.isNotEmpty(),
+        hasPrevious = hasSelection && state.selectedSentenceIndex > 0,
+        hasNext = hasSelection && state.selectedSentenceIndex < material.sentences.lastIndex,
+        onPrevious = onPrevious,
+        onPlayPause = onPlayPause,
+        onNext = onNext,
+        testTagPrefix = "material_player",
         modifier = Modifier.fillMaxWidth(),
-        color = EditorialSurface,
-        tonalElevation = 2.dp,
-        shadowElevation = 3.dp,
     ) {
-        Column {
-            EditorialProgress(percent / 100f)
+        EditorialSectionHeader(
+            title = "朗读控制",
+            subtitle = if (hasSelection) {
+                "第 ${state.selectedSentenceIndex + 1} / ${material.sentences.size} 句 · 已完成 $percent%"
+            } else {
+                "选择任一句开始朗读"
+            },
+        )
+        EditorialProgress(percent / 100f)
+        Text(
+            if (ready && !usesTranslation) "目标语语音已就绪"
+            else if (ready) "目标语与普通话语音已就绪" else voiceStatus(state),
+            style = MaterialTheme.typography.bodySmall,
+            color = if (ready) EditorialPine else MaterialTheme.colorScheme.error,
+        )
+        if (material.origin == ArticleOrigin.NEWS_FEED &&
+            material.sentences.any { !it.simplifiedChinese.isNullOrBlank() }
+        ) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth().testTag("material_news_translation_toggle"),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(
-                    Modifier.weight(1f).clickable { expanded = true }.testTag("material_player_expand"),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    Text(
-                        if (hasSelection) "第 ${state.selectedSentenceIndex + 1} / ${material.sentences.size} 句" else "选择句子开始朗读",
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                    Text(
-                        when {
-                            state.playbackStatus == PlaybackStatus.PREPARING -> "正在准备语音…"
-                            !ready -> voiceStatus(state)
-                            else -> "${if (state.playbackMode == PlaybackMode.SINGLE) "单组" else "连续"} · " +
-                                "${formatBand(speechSpeed(state, targetLanguage))}x · 已完成 $percent%"
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (ready) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
-                        maxLines = 1,
-                    )
-                }
-                IconButton(
-                    onClick = onPrevious,
-                    enabled = hasSelection && state.selectedSentenceIndex > 0,
-                    modifier = Modifier.size(44.dp),
-                ) {
-                    Icon(painterResource(R.drawable.ic_skip_previous), contentDescription = "上一句")
-                }
-                FilledIconButton(
-                    onClick = onPlayPause,
-                    enabled = ready && material.sentences.isNotEmpty() && state.playbackStatus != PlaybackStatus.PREPARING,
-                    modifier = Modifier.size(52.dp).testTag("material_play_pause"),
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = EditorialPine,
-                        contentColor = Color.White,
-                    ),
-                ) {
-                    Icon(
-                        painterResource(
-                            if (state.playbackStatus == PlaybackStatus.PLAYING) R.drawable.ic_pause
-                            else R.drawable.ic_play_arrow,
-                        ),
-                        contentDescription = if (state.playbackStatus == PlaybackStatus.PLAYING) "暂停" else "播放",
-                        modifier = Modifier.size(28.dp),
-                    )
-                }
-                IconButton(
-                    onClick = onNext,
-                    enabled = hasSelection && state.selectedSentenceIndex < material.sentences.lastIndex,
-                    modifier = Modifier.size(44.dp),
-                ) {
-                    Icon(painterResource(R.drawable.ic_skip_next), contentDescription = "下一句")
-                }
-            }
-            if (state.playbackStatus == PlaybackStatus.PREPARING) {
-                LinearProgressIndicator(
-                    modifier = Modifier.fillMaxWidth().testTag("material_speech_preparing"),
-                    color = EditorialTerracotta,
-                    trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                Text("显示中文翻译", style = MaterialTheme.typography.labelLarge)
+                Switch(
+                    checked = state.showNewsTranslations,
+                    onCheckedChange = onShowNewsTranslations,
                 )
             }
         }
+        EditorialSegmentedControl(
+            options = listOf(PlaybackMode.SINGLE to "单句", PlaybackMode.CONTINUOUS to "连续"),
+            selected = state.playbackMode,
+            onSelect = onPlaybackModeChange,
+            optionModifier = { mode -> Modifier.testTag("material_mode_${mode.name.lowercase()}") },
+        )
+        MaterialSpeedSetting(
+            label = "${MaterialPlaybackSupport.languageName(targetLanguage)}语速",
+            language = targetLanguage,
+            value = speechSpeed(state, targetLanguage),
+            onChange = onSpeedChange,
+            onChangeFinished = onSpeedChangeFinished,
+        )
+        if (usesTranslation) {
+            MaterialSpeedSetting(
+                label = "中文翻译语速",
+                language = SpeechLanguage.MANDARIN_CN,
+                value = speechSpeed(state, SpeechLanguage.MANDARIN_CN),
+                onChange = onSpeedChange,
+                onChangeFinished = onSpeedChangeFinished,
+            )
+        }
+        NumericStepper(
+            label = "正文字号",
+            value = state.readingFontSizeSp.toFloat(),
+            range = MIN_READING_FONT_SIZE_SP.toFloat()..MAX_READING_FONT_SIZE_SP.toFloat(),
+            step = 1f,
+            decimalPlaces = 0,
+            unit = "sp",
+        onValueCommitted = { onReadingFontSizeChange(it.toInt()) },
+        testTagPrefix = "material_font_size",
+        modifier = Modifier.testTag("material_font_size"),
+        )
     }
 }
 
@@ -409,71 +353,26 @@ private fun MaterialSpeedSetting(
     onChange: (SpeechLanguage, Float) -> Unit,
     onChangeFinished: (SpeechLanguage) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(label, style = MaterialTheme.typography.labelLarge)
-            Text(
-                String.format(Locale.US, "%.1fx", value),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
-        Slider(
-            value = value,
-            onValueChange = { onChange(language, it) },
-            onValueChangeFinished = { onChangeFinished(language) },
-            valueRange = 0.5f..2.0f,
-            steps = 14,
-            modifier = Modifier.fillMaxWidth().testTag("material_speed_${language.name.lowercase()}"),
-        )
-    }
+    NumericStepper(
+        label = label,
+        value = value,
+        range = 0.5f..2.0f,
+        step = 0.1f,
+        decimalPlaces = 1,
+        unit = "x",
+        onValueCommitted = {
+            onChange(language, it)
+            onChangeFinished(language)
+        },
+        testTagPrefix = "material_speed_${language.name.lowercase()}",
+        modifier = Modifier.testTag("material_speed_${language.name.lowercase()}"),
+    )
 }
 
 private fun speechSpeed(state: MaterialUiState, language: SpeechLanguage): Float = when (language) {
     SpeechLanguage.ENGLISH_US -> state.englishSpeed
     SpeechLanguage.CANTONESE_HK -> state.cantoneseSpeed
     SpeechLanguage.MANDARIN_CN -> state.mandarinSpeed
-}
-
-@Composable
-private fun PlayerTransportControls(
-    playing: Boolean,
-    preparing: Boolean,
-    canPlay: Boolean,
-    hasPrevious: Boolean,
-    hasNext: Boolean,
-    onPrevious: () -> Unit,
-    onPlayPause: () -> Unit,
-    onNext: () -> Unit,
-    playTag: String,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconButton(onClick = onPrevious, enabled = hasPrevious, modifier = Modifier.size(48.dp)) {
-            Icon(painterResource(R.drawable.ic_skip_previous), contentDescription = "上一句")
-        }
-        FilledIconButton(
-            onClick = onPlayPause,
-            enabled = canPlay && !preparing,
-            modifier = Modifier.size(60.dp).testTag(playTag),
-            colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = EditorialPine,
-                contentColor = Color.White,
-            ),
-        ) {
-            Icon(
-                painterResource(if (playing) R.drawable.ic_pause else R.drawable.ic_play_arrow),
-                contentDescription = if (playing) "暂停" else "播放",
-                modifier = Modifier.size(32.dp),
-            )
-        }
-        IconButton(onClick = onNext, enabled = hasNext, modifier = Modifier.size(48.dp)) {
-            Icon(painterResource(R.drawable.ic_skip_next), contentDescription = "下一句")
-        }
-    }
 }
 
 private fun voiceStatus(state: MaterialUiState): String = when {

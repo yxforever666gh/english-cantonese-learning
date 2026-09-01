@@ -462,6 +462,42 @@ class MaterialViewModelTest {
         assertEquals(1, speech.spoken.count { it.text == "Manual sentence." })
     }
 
+    @Test
+    fun translatedNewsUsesGlobalVisibilityForDisplayAndBilingualPlayback() = runTest {
+        val news = material("news").copy(origin = ArticleOrigin.NEWS_FEED)
+        repository.replaceWith(news)
+        viewModel.reloadMaterials()
+        viewModel.openMaterial("news")
+        viewModel.setPlaybackMode(PlaybackMode.SINGLE)
+        viewModel.selectAndPlaySentence(0)
+
+        speech.emit(SpeechEvent.Done(speech.spoken.last().requestId))
+
+        assertEquals(SpeechLanguage.MANDARIN_CN, speech.spoken.last().language)
+        assertEquals("第一句中文。", speech.spoken.last().text)
+
+        viewModel.setShowNewsTranslations(false)
+        mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+        val spokenBefore = speech.spoken.size
+        viewModel.selectAndPlaySentence(1)
+        speech.emit(SpeechEvent.Done(speech.spoken.last().requestId))
+
+        assertFalse(viewModel.uiState.value.showNewsTranslations)
+        assertEquals(spokenBefore + 1, speech.spoken.size)
+        assertEquals("Second English sentence.", speech.spoken.last().text)
+    }
+
+    @Test
+    fun readingFontSizeFollowsSharedPreferenceUpdates() = runTest {
+        assertEquals(16, viewModel.uiState.value.readingFontSizeSp)
+
+        viewModel.setReadingFontSizeSp(24)
+        mainDispatcherRule.dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(24, viewModel.uiState.value.readingFontSizeSp)
+        assertEquals(24, preferences.readingFontSizeSp.value)
+    }
+
     private fun material(id: String = "material-1") = PracticeMaterial(
         id = id,
         batchId = "batch-1",
@@ -529,7 +565,11 @@ private class FakeLearnerPreferences : LearnerPreferences {
     private var profile = LearnerProfile()
     var libraryLanguage = MaterialLanguage.ENGLISH
     private val mutableSpeeds = MutableStateFlow(SpeechSpeedPreferences())
+    private val mutableShowNewsTranslations = MutableStateFlow(true)
+    private val mutableReadingFontSizeSp = MutableStateFlow(16)
     override val speechSpeeds: StateFlow<SpeechSpeedPreferences> = mutableSpeeds
+    override val showNewsTranslations: StateFlow<Boolean> = mutableShowNewsTranslations
+    override val readingFontSizeSp: StateFlow<Int> = mutableReadingFontSizeSp
     override fun learnerProfile(): LearnerProfile = profile
     override fun setListeningBand(band: Float) {
         profile = profile.copy(listeningBand = band)
@@ -541,6 +581,12 @@ private class FakeLearnerPreferences : LearnerPreferences {
     override fun speechSpeed(language: SpeechLanguage): Float = mutableSpeeds.value.forLanguage(language)
     override fun setSpeechSpeed(language: SpeechLanguage, speed: Float) {
         mutableSpeeds.value = mutableSpeeds.value.withSpeed(language, speed.coerceIn(0.5f, 2.0f))
+    }
+    override fun setShowNewsTranslations(show: Boolean) {
+        mutableShowNewsTranslations.value = show
+    }
+    override fun setReadingFontSizeSp(sizeSp: Int) {
+        mutableReadingFontSizeSp.value = sizeSp.coerceIn(12, 32)
     }
 }
 

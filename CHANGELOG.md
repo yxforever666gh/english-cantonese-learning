@@ -2,6 +2,39 @@
 
 All notable changes to this project are documented here.
 
+## [4.2] - 2026-09-02
+
+### Added
+
+- A globally synchronized reading font size for news, saved materials, translations, Jyutping, and pasted-article reading.
+- Reusable editable minus/value/plus controls for speech speed and font size.
+- Compact top-left sentence number badges that no longer reserve a wide text column.
+
+### Changed
+
+- Unified news, material, and pasted-article players as collapsible bottom panels.
+- Collapsed players now keep only transport controls and an explicit expand arrow.
+- Moved saved/live news translation visibility controls into the expanded player.
+- Replaced all reader speech-speed sliders with editable step controls; the IELTS level slider remains unchanged.
+
+## [4.1] - 2026-09-01
+
+### Added
+
+- Automatic Simplified Chinese title translation for English and Cantonese news, with the original headline kept primary.
+- Progressive sentence-aligned full-article translation with strict structured responses and provider failover.
+- Persistent title and article translation caches to avoid repeated model charges.
+- A globally remembered translation visibility switch shared by live news and saved news materials.
+
+### Changed
+
+- News playback becomes source-language plus Mandarin translation when translations are visible, and source-only when hidden.
+- News bookmarks now require and preserve complete sentence translations without changing the Room schema.
+
+### Resilience
+
+- RSS refresh and original article reading remain available when every translation model fails.
+
 ## [4.0] - 2026-09-01
 
 ### Added

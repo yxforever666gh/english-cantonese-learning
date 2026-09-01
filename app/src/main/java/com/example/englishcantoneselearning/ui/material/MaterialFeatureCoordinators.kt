@@ -226,6 +226,7 @@ internal object MaterialPlaybackSupport {
         material: PracticeMaterial,
         indices: Iterable<Int> = material.sentences.indices.asIterable(),
         speedFor: (SpeechLanguage) -> Float,
+        includeTranslations: Boolean = material.origin != ArticleOrigin.MANUAL_PASTE,
     ): List<SpeechCacheEntry> = buildList {
         indices.forEach { index ->
             val sentence = material.sentences.getOrNull(index) ?: return@forEach
@@ -233,7 +234,7 @@ internal object MaterialPlaybackSupport {
             if (sentence.targetText.isNotBlank()) {
                 add(SpeechCacheEntry(sentence.targetText, targetLanguage, speedFor(targetLanguage)))
             }
-            if (material.origin == ArticleOrigin.AI_GENERATED && sentence.simplifiedChinese?.isNotBlank() == true) {
+            if (includeTranslations && sentence.simplifiedChinese?.isNotBlank() == true) {
                 add(SpeechCacheEntry(sentence.simplifiedChinese, SpeechLanguage.MANDARIN_CN, speedFor(SpeechLanguage.MANDARIN_CN)))
             }
         }
@@ -243,9 +244,10 @@ internal object MaterialPlaybackSupport {
         material: PracticeMaterial,
         currentIndex: Int,
         speedFor: (SpeechLanguage) -> Float,
+        includeTranslations: Boolean = material.origin != ArticleOrigin.MANUAL_PASTE,
     ): List<SpeechCacheEntry> = buildList {
         val currentSentence = material.sentences.getOrNull(currentIndex) ?: return@buildList
-        if (material.origin == ArticleOrigin.AI_GENERATED &&
+        if (includeTranslations &&
             currentSentence.simplifiedChinese?.isNotBlank() == true
         ) {
             add(
@@ -261,6 +263,7 @@ internal object MaterialPlaybackSupport {
                 material = material,
                 indices = (currentIndex + 1)..(currentIndex + PRELOAD_AHEAD_SENTENCES),
                 speedFor = speedFor,
+                includeTranslations = includeTranslations,
             ),
         )
     }

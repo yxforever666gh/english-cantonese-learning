@@ -40,6 +40,7 @@ data class ReaderUiState(
     val playbackMode: PlaybackMode = PlaybackMode.CONTINUOUS,
     val playbackStatus: PlaybackStatus = PlaybackStatus.IDLE,
     val speed: Float = 0.8f,
+    val readingFontSizeSp: Int = 16,
     val ttsAvailability: TtsAvailability = TtsAvailability.INITIALIZING,
     val userMessage: String? = null,
 )

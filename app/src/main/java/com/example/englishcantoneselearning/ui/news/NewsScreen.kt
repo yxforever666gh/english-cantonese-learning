@@ -1,7 +1,6 @@
 package com.example.englishcantoneselearning.ui.news
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -27,10 +26,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -48,12 +47,15 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.englishcantoneselearning.R
 import com.example.englishcantoneselearning.model.MaterialLanguage
+import com.example.englishcantoneselearning.model.BilingualPhase
 import com.example.englishcantoneselearning.model.NewsItem
 import com.example.englishcantoneselearning.model.PlaybackMode
 import com.example.englishcantoneselearning.model.PlaybackStatus
 import com.example.englishcantoneselearning.model.TtsAvailability
+import com.example.englishcantoneselearning.model.SpeechLanguage
 import com.example.englishcantoneselearning.ui.EditorialChoiceChip
 import com.example.englishcantoneselearning.ui.EditorialEmptyState
 import com.example.englishcantoneselearning.ui.EditorialPageHeader
@@ -61,11 +63,13 @@ import com.example.englishcantoneselearning.ui.EditorialSegmentedControl
 import com.example.englishcantoneselearning.ui.EditorialStatusPanel
 import com.example.englishcantoneselearning.ui.EditorialStatusTone
 import com.example.englishcantoneselearning.ui.MetadataPill
+import com.example.englishcantoneselearning.ui.CollapsiblePlayerSurface
+import com.example.englishcantoneselearning.ui.CompactSentenceNumberBadge
+import com.example.englishcantoneselearning.ui.NumericStepper
 import com.example.englishcantoneselearning.ui.editorialContentWidth
 import com.example.englishcantoneselearning.ui.theme.EditorialInk
 import com.example.englishcantoneselearning.ui.theme.EditorialMint
 import com.example.englishcantoneselearning.ui.theme.EditorialPine
-import com.example.englishcantoneselearning.ui.theme.EditorialSurface
 import java.text.DateFormat
 import java.util.Date
 
@@ -136,6 +140,8 @@ fun NewsScreen(
                         onPlaybackModeChange = viewModel::setPlaybackMode,
                         onSpeedChange = viewModel::setSpeechSpeed,
                         onSpeedChangeFinished = viewModel::onSpeechSpeedChangeFinished,
+                        onShowTranslations = viewModel::setShowTranslations,
+                        onFontSizeChange = viewModel::setReadingFontSizeSp,
                         onPrevious = viewModel::previousSentence,
                         onPlayPause = viewModel::playOrPause,
                         onNext = viewModel::nextSentence,
@@ -153,6 +159,7 @@ fun NewsScreen(
                 NewsFeed(
                     state = state,
                     onLanguage = viewModel::setLanguage,
+                    onShowTranslations = viewModel::setShowTranslations,
                     onLatest = viewModel::showLatest,
                     onTag = viewModel::toggleTag,
                     onRefresh = { viewModel.refresh(forceRefresh = true) },
@@ -163,6 +170,7 @@ fun NewsScreen(
                 NewsDetail(
                     state = state,
                     onRetry = viewModel::retryArticle,
+                    onRetryTranslation = viewModel::retryArticleTranslations,
                     onPlaySentence = viewModel::selectAndPlay,
                     onSave = viewModel::saveArticle,
                     onOpenSavedMaterial = onOpenSavedMaterial,
@@ -178,6 +186,7 @@ fun NewsScreen(
 internal fun NewsFeed(
     state: NewsUiState,
     onLanguage: (MaterialLanguage) -> Unit,
+    onShowTranslations: (Boolean) -> Unit,
     onLatest: () -> Unit,
     onTag: (com.example.englishcantoneselearning.model.NewsTag) -> Unit,
     onRefresh: () -> Unit,
@@ -212,6 +221,18 @@ internal fun NewsFeed(
                         Modifier.testTag("news_language_${language.name.lowercase()}")
                     },
                 )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("显示中文翻译", style = MaterialTheme.typography.bodyMedium)
+                    Switch(
+                        checked = state.showTranslations,
+                        onCheckedChange = onShowTranslations,
+                        modifier = Modifier.testTag("news_translation_toggle"),
+                    )
+                }
                 Spacer(Modifier.height(12.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -252,6 +273,15 @@ internal fun NewsFeed(
                     )
                 }
             }
+            state.titleTranslationError?.takeIf { state.showTranslations }?.let { translationError ->
+                item {
+                    EditorialStatusPanel(
+                        title = "部分标题翻译失败",
+                        body = translationError,
+                        tone = EditorialStatusTone.WARNING,
+                    )
+                }
+            }
 
             if (!state.isRefreshing && state.items.isEmpty()) {
                 item {
@@ -272,14 +302,18 @@ internal fun NewsFeed(
             }
 
             items(state.visibleItems, key = NewsItem::url) { item ->
-                NewsCard(item = item, onClick = { onOpen(item) })
+                NewsCard(
+                    item = item,
+                    translatedTitle = state.titleTranslations[item.url].takeIf { state.showTranslations },
+                    onClick = { onOpen(item) },
+                )
             }
         }
     }
 }
 
 @Composable
-private fun NewsCard(item: NewsItem, onClick: () -> Unit) {
+private fun NewsCard(item: NewsItem, translatedTitle: String?, onClick: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
             .testTag("news_card_${item.sourceId}_${item.url.hashCode()}"),
@@ -294,6 +328,13 @@ private fun NewsCard(item: NewsItem, onClick: () -> Unit) {
                 fontWeight = FontWeight.Bold,
                 color = EditorialInk,
             )
+            translatedTitle?.takeIf(String::isNotBlank)?.let { translation ->
+                Text(
+                    translation,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             item.summary.takeIf(String::isNotBlank)?.let { summary ->
                 Text(
                     summary,
@@ -324,6 +365,7 @@ private fun NewsCard(item: NewsItem, onClick: () -> Unit) {
 internal fun NewsDetail(
     state: NewsUiState,
     onRetry: () -> Unit,
+    onRetryTranslation: () -> Unit,
     onPlaySentence: (Int) -> Unit,
     onSave: () -> Unit,
     onOpenSavedMaterial: (String) -> Unit,
@@ -345,6 +387,16 @@ internal fun NewsDetail(
                     selectedItem.publishedAt?.takeIf(String::isNotBlank),
                 ).joinToString(" · "),
             )
+            state.titleTranslations[selectedItem.url]
+                ?.takeIf { state.showTranslations && it.isNotBlank() }
+                ?.let { translation ->
+                    Text(
+                        translation,
+                        modifier = Modifier.padding(top = 8.dp),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             if (selectedItem.tags.isNotEmpty()) {
                 Spacer(Modifier.height(12.dp))
                 Row(
@@ -371,13 +423,16 @@ internal fun NewsDetail(
                         Spacer(Modifier.width(6.dp))
                         Text("已保存")
                     }
-                    state.article != null -> Button(
+                    state.article != null && state.hasCompleteArticleTranslation -> Button(
                         onClick = onSave,
                         modifier = Modifier.testTag("news_save"),
                     ) {
                         Icon(painterResource(R.drawable.ic_save), contentDescription = null)
                         Spacer(Modifier.width(6.dp))
                         Text("保存到材料库")
+                    }
+                    state.article != null -> OutlinedButton(onClick = {}, enabled = false) {
+                        Text(if (state.isArticleTranslating) "翻译完成后可收藏" else "需要完整中文翻译")
                     }
                 }
             }
@@ -398,7 +453,26 @@ internal fun NewsDetail(
                     action = { TextButton(onClick = onRetry) { Text("重试") } },
                 )
             }
-            else -> items(state.sentences.size) { index ->
+            else -> {
+                if (state.showTranslations &&
+                    (state.isArticleTranslating || state.articleTranslationError != null)
+                ) {
+                    item {
+                        EditorialStatusPanel(
+                            title = if (state.isArticleTranslating) "正在翻译正文" else "部分正文翻译失败",
+                            body = state.articleTranslationError ?: "译文会按批次逐步显示，原文阅读不受影响。",
+                            tone = if (state.articleTranslationError == null) {
+                                EditorialStatusTone.INFO
+                            } else {
+                                EditorialStatusTone.WARNING
+                            },
+                            action = if (state.articleTranslationError == null) null else {
+                                { TextButton(onClick = onRetryTranslation) { Text("重试缺失句") } }
+                            },
+                        )
+                    }
+                }
+                items(state.sentences.size) { index ->
                 val sentence = state.sentences[index]
                 val selected = index == state.selectedSentenceIndex
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -416,49 +490,47 @@ internal fun NewsDetail(
                         shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
                         color = if (selected) EditorialMint else Color.Transparent,
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 14.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        Column(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalArrangement = Arrangement.spacedBy(5.dp),
                         ) {
-                            Box(
-                                Modifier.width(3.dp).height(42.dp).background(
-                                    if (selected) EditorialPine else Color.Transparent,
-                                    androidx.compose.foundation.shape.RoundedCornerShape(99.dp),
-                                ),
-                            )
-                            Text(
-                                "${index + 1}",
-                                modifier = Modifier.width(28.dp),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = if (selected) EditorialPine else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            CompactSentenceNumberBadge(number = index + 1, selected = selected)
                                 Text(
                                     sentence.text,
-                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontSize = state.readingFontSizeSp.sp,
+                                    lineHeight = (state.readingFontSizeSp * 1.5f).sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = EditorialInk,
                                 )
+                                state.sentenceTranslations[sentence.id]
+                                    ?.takeIf { state.showTranslations && it.isNotBlank() }
+                                    ?.let { translation ->
+                                        Text(
+                                            translation,
+                                            fontSize = state.readingFontSizeSp.sp,
+                                            lineHeight = (state.readingFontSizeSp * 1.5f).sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
                                 if (selected && state.playbackStatus in
                                     setOf(PlaybackStatus.PREPARING, PlaybackStatus.PLAYING)
                                 ) {
                                     Text(
                                         if (state.playbackStatus == PlaybackStatus.PREPARING) {
                                             "正在准备语音…"
+                                        } else if (state.bilingualPhase == BilingualPhase.TRANSLATION) {
+                                            "正在朗读中文翻译"
                                         } else {
-                                            "正在朗读"
+                                            "正在朗读原文"
                                         },
                                         style = MaterialTheme.typography.labelMedium,
                                         color = EditorialPine,
                                     )
                                 }
-                            }
                         }
                     }
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 49.dp),
-                        color = MaterialTheme.colorScheme.outlineVariant,
-                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
                 }
             }
         }
@@ -469,91 +541,103 @@ internal fun NewsDetail(
 private fun NewsPlayerPanel(
     state: NewsUiState,
     onPlaybackModeChange: (PlaybackMode) -> Unit,
-    onSpeedChange: (Float) -> Unit,
-    onSpeedChangeFinished: () -> Unit,
+    onSpeedChange: (SpeechLanguage, Float) -> Unit,
+    onSpeedChangeFinished: (SpeechLanguage) -> Unit,
+    onShowTranslations: (Boolean) -> Unit,
+    onFontSizeChange: (Int) -> Unit,
     onPrevious: () -> Unit,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
 ) {
     val hasSelection = state.selectedSentenceIndex in state.sentences.indices
-    val ready = state.ttsAvailability == TtsAvailability.READY
-    Surface(
-        modifier = Modifier.fillMaxWidth().testTag("news_player"),
-        color = EditorialSurface,
-        tonalElevation = 2.dp,
-        shadowElevation = 3.dp,
+    val targetLanguage = if (state.language == MaterialLanguage.ENGLISH) {
+        SpeechLanguage.ENGLISH_US
+    } else {
+        SpeechLanguage.CANTONESE_HK
+    }
+    val ready = state.ttsAvailability == TtsAvailability.READY &&
+        (!state.showTranslations || state.mandarinAvailability == TtsAvailability.READY)
+    CollapsiblePlayerSurface(
+        stateKey = "news-player-${state.selectedItem?.url.orEmpty()}",
+        playing = state.playbackStatus == PlaybackStatus.PLAYING,
+        preparing = state.playbackStatus == PlaybackStatus.PREPARING,
+        canPlay = ready && state.sentences.isNotEmpty(),
+        hasPrevious = hasSelection && state.selectedSentenceIndex > 0,
+        hasNext = hasSelection && state.selectedSentenceIndex < state.sentences.lastIndex,
+        onPrevious = onPrevious,
+        onPlayPause = onPlayPause,
+        onNext = onNext,
+        testTagPrefix = "news",
     ) {
-        Column(
-            Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        if (hasSelection) {
-                            "第 ${state.selectedSentenceIndex + 1} / ${state.sentences.size} 句"
-                        } else {
-                            "选择句子开始朗读"
-                        },
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                    Text(
-                        if (ready) {
-                            "${if (state.playbackMode == PlaybackMode.CONTINUOUS) "连续" else "单句"} · " +
-                                "${formatSpeed(state.speed)}x"
-                        } else {
-                            voiceStatus(state.ttsAvailability)
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (ready) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
-                    )
-                }
-                IconButton(
-                    onClick = onPrevious,
-                    enabled = hasSelection && state.selectedSentenceIndex > 0,
-                ) {
-                    Icon(painterResource(R.drawable.ic_skip_previous), contentDescription = "上一句")
-                }
-                IconButton(
-                    onClick = onPlayPause,
-                    enabled = ready && state.sentences.isNotEmpty(),
-                    modifier = Modifier.size(48.dp).testTag("news_play_pause"),
-                ) {
-                    Icon(
-                        painterResource(
-                            if (state.playbackStatus == PlaybackStatus.PLAYING) R.drawable.ic_pause
-                            else R.drawable.ic_play_arrow,
-                        ),
-                        contentDescription = if (state.playbackStatus == PlaybackStatus.PLAYING) "暂停" else "播放",
-                    )
-                }
-                IconButton(
-                    onClick = onNext,
-                    enabled = hasSelection && state.selectedSentenceIndex < state.sentences.lastIndex,
-                ) {
-                    Icon(painterResource(R.drawable.ic_skip_next), contentDescription = "下一句")
-                }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    if (state.language == MaterialLanguage.ENGLISH) "英语语速" else "粤语语速",
-                    modifier = Modifier.width(72.dp),
-                    style = MaterialTheme.typography.labelMedium,
+                    if (hasSelection) "第 ${state.selectedSentenceIndex + 1} / ${state.sentences.size} 句"
+                    else "选择句子开始朗读",
+                    style = MaterialTheme.typography.titleSmall,
                 )
-                Slider(
-                    value = state.speed,
-                    onValueChange = onSpeedChange,
-                    onValueChangeFinished = onSpeedChangeFinished,
-                    valueRange = 0.5f..2.0f,
-                    steps = 14,
-                    modifier = Modifier.weight(1f).testTag("news_speed_slider"),
+                Text(
+                    if (ready) {
+                        if (state.playbackStatus == PlaybackStatus.PREPARING) "正在准备语音…"
+                        else if (state.playbackMode == PlaybackMode.CONTINUOUS) "连续" else "单句"
+                    } else voiceStatus(state.ttsAvailability),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (ready) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
                 )
-                Text("${formatSpeed(state.speed)}x", modifier = Modifier.width(44.dp))
             }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text("显示中文翻译", style = MaterialTheme.typography.bodyMedium)
+                Switch(
+                    checked = state.showTranslations,
+                    onCheckedChange = onShowTranslations,
+                    modifier = Modifier.testTag("news_player_translation_toggle"),
+                )
+            }
+            NumericStepper(
+                label = if (state.language == MaterialLanguage.ENGLISH) "英语语速" else "粤语语速",
+                value = state.speed,
+                range = 0.5f..2.0f,
+                step = 0.1f,
+                decimalPlaces = 1,
+                unit = "x",
+                onValueCommitted = {
+                    onSpeedChange(targetLanguage, it)
+                    onSpeedChangeFinished(targetLanguage)
+                },
+                testTagPrefix = "news_speed",
+            )
+            if (state.showTranslations) {
+                NumericStepper(
+                    label = "中文语速",
+                    value = state.mandarinSpeed,
+                    range = 0.5f..2.0f,
+                    step = 0.1f,
+                    decimalPlaces = 1,
+                    unit = "x",
+                    onValueCommitted = {
+                        onSpeedChange(SpeechLanguage.MANDARIN_CN, it)
+                        onSpeedChangeFinished(SpeechLanguage.MANDARIN_CN)
+                    },
+                    testTagPrefix = "news_mandarin_speed",
+                )
+            }
+            NumericStepper(
+                label = "正文字号",
+                value = state.readingFontSizeSp.toFloat(),
+                range = 12f..32f,
+                step = 1f,
+                decimalPlaces = 0,
+                unit = "sp",
+                onValueCommitted = { onFontSizeChange(it.toInt()) },
+                testTagPrefix = "news_font_size",
+            )
             EditorialSegmentedControl(
                 options = listOf(PlaybackMode.SINGLE to "单句", PlaybackMode.CONTINUOUS to "连续"),
                 selected = state.playbackMode,
@@ -561,14 +645,11 @@ private fun NewsPlayerPanel(
                 modifier = Modifier.fillMaxWidth(),
                 optionModifier = { Modifier },
             )
-        }
     }
 }
 
 private fun formatTimestamp(timestamp: Long): String =
     DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(timestamp))
-
-private fun formatSpeed(speed: Float): String = String.format(java.util.Locale.US, "%.1f", speed)
 
 private fun voiceStatus(availability: TtsAvailability): String = when (availability) {
     TtsAvailability.INITIALIZING -> "语音正在初始化"

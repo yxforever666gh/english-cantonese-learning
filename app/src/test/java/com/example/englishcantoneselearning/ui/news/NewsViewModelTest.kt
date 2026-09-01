@@ -2,6 +2,10 @@ package com.example.englishcantoneselearning.ui.news
 
 import com.example.englishcantoneselearning.data.preferences.LearnerPreferences
 import com.example.englishcantoneselearning.data.preferences.SpeechSpeedPreferences
+import com.example.englishcantoneselearning.data.news.NoOpArticleTranslationCache
+import com.example.englishcantoneselearning.data.news.NoOpTitleTranslationCache
+import com.example.englishcantoneselearning.data.network.NewsTranslationInput
+import com.example.englishcantoneselearning.data.network.NewsTranslationService
 import com.example.englishcantoneselearning.data.repository.MaterialRepository
 import com.example.englishcantoneselearning.data.source.FixedSourceRepository
 import com.example.englishcantoneselearning.model.ArticleOrigin
@@ -47,6 +51,7 @@ class NewsViewModelTest {
     private lateinit var materials: FakeMaterialRepository
     private lateinit var preferences: FakeNewsPreferences
     private lateinit var speech: FakeNewsSpeechController
+    private lateinit var translator: FakeNewsTranslationService
     private lateinit var viewModel: NewsViewModel
 
     @Before
@@ -55,7 +60,18 @@ class NewsViewModelTest {
         materials = FakeMaterialRepository()
         preferences = FakeNewsPreferences()
         speech = FakeNewsSpeechController()
-        viewModel = NewsViewModel(sources, materials, preferences, speech, now = { 1234L })
+        translator = FakeNewsTranslationService()
+        viewModel = NewsViewModel(
+            sources,
+            materials,
+            preferences,
+            speech,
+            translator,
+            NoOpTitleTranslationCache,
+            NoOpArticleTranslationCache,
+            ioDispatcher = mainDispatcherRule.dispatcher,
+            now = { 1234L },
+        )
     }
 
     @Test
@@ -74,6 +90,9 @@ class NewsViewModelTest {
         assertEquals(listOf(technology), viewModel.uiState.value.visibleItems)
         assertEquals(1, viewModel.uiState.value.tagCounts.getValue(NewsTag.HEALTH))
         assertEquals(1, sources.forceRefreshValues.size)
+        assertEquals("译：Technology story", viewModel.uiState.value.titleTranslations[technology.url])
+        assertEquals(setOf("Technology story", "Health story"), translator.titleInputs.map { it.text }.toSet())
+        assertTrue(translator.titleInputs.none { it.text == "Summary" })
     }
 
     @Test
@@ -151,6 +170,8 @@ class NewsViewModelTest {
 
     @Test
     fun playbackPreloadsExactlyTheNextTwoSentencesConcurrently() = runTest {
+        viewModel.setShowTranslations(false)
+        runCurrent()
         sources.article = snapshot(
             SourceParagraph("p", null, "One. Two. Three. Four."),
         )
@@ -197,6 +218,32 @@ class NewsViewModelTest {
         assertEquals(1.1f, preferences.speechSpeed(SpeechLanguage.ENGLISH_US))
         assertEquals(2, speech.spoken.size)
         assertEquals(1.1f, speech.spoken.last().speed)
+    }
+
+    @Test
+    fun visibleTranslationsPlayMandarinAndHidingStopsTranslationPhase() = runTest {
+        sources.article = snapshot(SourceParagraph("p", null, "One. Two."))
+        viewModel.openArticle(news("Story", NewsTag.INTERNATIONAL))
+        advanceUntilIdle()
+        viewModel.setPlaybackMode(com.example.englishcantoneselearning.model.PlaybackMode.SINGLE)
+        viewModel.playOrPause()
+
+        speech.emit(SpeechEvent.Done(speech.spoken.single().requestId))
+        runCurrent()
+
+        assertEquals(SpeechLanguage.MANDARIN_CN, speech.spoken.last().language)
+        assertEquals("译：One.", speech.spoken.last().text)
+        viewModel.setShowTranslations(false)
+        runCurrent()
+        assertEquals(com.example.englishcantoneselearning.model.PlaybackStatus.IDLE,
+            viewModel.uiState.value.playbackStatus)
+
+        val count = speech.spoken.size
+        viewModel.selectAndPlay(1)
+        speech.emit(SpeechEvent.Done(speech.spoken.last().requestId))
+        runCurrent()
+        assertEquals(count + 1, speech.spoken.size)
+        assertEquals(SpeechLanguage.ENGLISH_US, speech.spoken.last().language)
     }
 }
 
@@ -270,7 +317,9 @@ private class FakeMaterialRepository : MaterialRepository {
 
 private class FakeNewsPreferences : LearnerPreferences {
     private val mutableSpeeds = MutableStateFlow(SpeechSpeedPreferences())
+    private val mutableShowTranslations = MutableStateFlow(true)
     override val speechSpeeds: StateFlow<SpeechSpeedPreferences> = mutableSpeeds
+    override val showNewsTranslations: StateFlow<Boolean> = mutableShowTranslations
     private var language = MaterialLanguage.ENGLISH
     override fun learnerProfile() = LearnerProfile()
     override fun setListeningBand(band: Float) = Unit
@@ -280,6 +329,25 @@ private class FakeNewsPreferences : LearnerPreferences {
     override fun setSpeechSpeed(language: SpeechLanguage, speed: Float) {
         mutableSpeeds.value = mutableSpeeds.value.withSpeed(language, speed)
     }
+    override fun setShowNewsTranslations(show: Boolean) {
+        mutableShowTranslations.value = show
+    }
+}
+
+private class FakeNewsTranslationService : NewsTranslationService {
+    val titleInputs = mutableListOf<NewsTranslationInput>()
+    val sentenceInputs = mutableListOf<NewsTranslationInput>()
+    override suspend fun translateTitles(inputs: List<NewsTranslationInput>): Map<String, String> =
+        inputs.associate { input ->
+            titleInputs += input
+            input.id to "译：${input.text}"
+        }
+
+    override suspend fun translateSentences(inputs: List<NewsTranslationInput>): Map<String, String> =
+        inputs.associate { input ->
+            sentenceInputs += input
+            input.id to "译：${input.text}"
+        }
 }
 
 private class FakeNewsSpeechController : SpeechController {

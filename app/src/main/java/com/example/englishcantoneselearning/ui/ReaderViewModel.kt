@@ -5,6 +5,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.englishcantoneselearning.AppContainer
 import com.example.englishcantoneselearning.data.preferences.DEFAULT_SPEECH_SPEED
+import com.example.englishcantoneselearning.data.preferences.DEFAULT_READING_FONT_SIZE_SP
+import com.example.englishcantoneselearning.data.preferences.MAX_READING_FONT_SIZE_SP
+import com.example.englishcantoneselearning.data.preferences.MIN_READING_FONT_SIZE_SP
 import com.example.englishcantoneselearning.data.preferences.LearnerPreferences
 import com.example.englishcantoneselearning.data.repository.MaterialRepository
 import com.example.englishcantoneselearning.model.MaterialLanguage
@@ -39,6 +42,7 @@ class ReaderViewModel(
     private val _uiState = MutableStateFlow(
         ReaderUiState(
             speed = userPreferences?.speechSpeed(SpeechLanguage.ENGLISH_US) ?: DEFAULT_SPEECH_SPEED,
+            readingFontSizeSp = userPreferences?.readingFontSizeSp?.value ?: DEFAULT_READING_FONT_SIZE_SP,
         ),
     )
     val uiState: StateFlow<ReaderUiState> = _uiState.asStateFlow()
@@ -57,6 +61,11 @@ class ReaderViewModel(
                     _uiState.update { state ->
                         state.copy(speed = speeds.forLanguage(state.language.toSpeechLanguage()))
                     }
+                }
+            }
+            viewModelScope.launch {
+                preferences.readingFontSizeSp.collect { fontSize ->
+                    _uiState.update { it.copy(readingFontSizeSp = fontSize) }
                 }
             }
         }
@@ -163,6 +172,12 @@ class ReaderViewModel(
         ) {
             startSpeaking(state.selectedIndex, 0)
         }
+    }
+
+    fun onReadingFontSizeChange(fontSizeSp: Int) {
+        val normalized = fontSizeSp.coerceIn(MIN_READING_FONT_SIZE_SP, MAX_READING_FONT_SIZE_SP)
+        _uiState.update { it.copy(readingFontSizeSp = normalized) }
+        userPreferences?.setReadingFontSizeSp(normalized)
     }
 
     fun playOrPause() {

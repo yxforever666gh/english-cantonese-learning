@@ -1,5 +1,6 @@
 package com.example.englishcantoneselearning.ui.material
 
+import com.example.englishcantoneselearning.data.preferences.DEFAULT_READING_FONT_SIZE_SP
 import com.example.englishcantoneselearning.model.BilingualPhase
 import com.example.englishcantoneselearning.model.MaterialLanguage
 import com.example.englishcantoneselearning.model.MaterialProviderConfig
@@ -55,6 +56,8 @@ data class MaterialUiState(
     val englishSpeed: Float = 0.8f,
     val cantoneseSpeed: Float = 0.8f,
     val mandarinSpeed: Float = 0.8f,
+    val showNewsTranslations: Boolean = true,
+    val readingFontSizeSp: Int = DEFAULT_READING_FONT_SIZE_SP,
     val generationError: String? = null,
     val userMessage: String? = null,
     val playbackProgress: Map<String, MaterialPlaybackProgress> = emptyMap(),

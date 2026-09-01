@@ -95,6 +95,8 @@ fun MaterialScreen(
                             onPlaybackModeChange = viewModel::setPlaybackMode,
                             onSpeedChange = viewModel::setSpeechSpeed,
                             onSpeedChangeFinished = viewModel::onSpeechSpeedChangeFinished,
+                            onShowNewsTranslations = viewModel::setShowNewsTranslations,
+                            onReadingFontSizeChange = viewModel::setReadingFontSizeSp,
                             onPrevious = viewModel::previousSentence,
                             onPlayPause = viewModel::playOrPause,
                             onNext = viewModel::nextSentence,

@@ -30,6 +30,9 @@ class MainActivity : ComponentActivity() {
             materialRepository = container.materialRepository,
             userPreferences = container.userPreferences,
             speechController = container.speechController,
+            translationService = container.newsTranslationService,
+            titleTranslationCache = container.titleTranslationCache,
+            articleTranslationCache = container.articleTranslationCache,
         )
     }
 

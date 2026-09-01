@@ -296,7 +296,10 @@ class MaterialScreenTest {
         }
 
         composeRule.onNodeWithText("nei5 hou2 aa3").assertExists()
+        composeRule.onNodeWithTag("sentence_number_1", useUnmergedTree = true).assertExists()
         composeRule.onNodeWithText("正在生成 MiniMax 语音…").assertExists()
+        composeRule.onNodeWithTag("material_speed_cantonese_hk").assertDoesNotExist()
+        composeRule.onNodeWithTag("material_font_size").assertDoesNotExist()
         composeRule.onNodeWithTag("material_detail_list").performScrollToIndex(2)
         composeRule.onNodeWithText("材料信息").performClick()
         composeRule.onNodeWithText("Source article").assertExists()
@@ -306,6 +309,7 @@ class MaterialScreenTest {
         composeRule.onNodeWithText("中文翻译语速").assertExists()
         composeRule.onNodeWithTag("material_speed_cantonese_hk").assertExists()
         composeRule.onNodeWithTag("material_speed_mandarin_cn").assertExists()
+        composeRule.onNodeWithTag("material_font_size").assertExists()
     }
 }
 

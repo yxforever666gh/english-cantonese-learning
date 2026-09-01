@@ -176,6 +176,23 @@ class ReaderViewModelTest {
         assertEquals(0, speechController.spoken.last().startOffset)
     }
 
+    @Test
+    fun readingFontSizeIsClampedAndSynchronizedAcrossReaderInstances() = runTest {
+        val preferences = FakeLearnerPreferences()
+        val first = ReaderViewModel(FakeSpeechController(), userPreferences = preferences)
+        val second = ReaderViewModel(FakeSpeechController(), userPreferences = preferences)
+
+        first.onReadingFontSizeChange(40)
+
+        assertEquals(32, first.uiState.value.readingFontSizeSp)
+        assertEquals(32, second.uiState.value.readingFontSizeSp)
+        assertEquals(32, preferences.readingFontSizeSp.value)
+
+        second.onReadingFontSizeChange(8)
+        assertEquals(12, first.uiState.value.readingFontSizeSp)
+        assertEquals(12, second.uiState.value.readingFontSizeSp)
+    }
+
     private fun prepare(text: String) {
         viewModel.onArticleTextChange(text)
         viewModel.segmentArticle()
@@ -184,7 +201,9 @@ class ReaderViewModelTest {
 
 private class FakeLearnerPreferences : LearnerPreferences {
     private val mutableSpeeds = MutableStateFlow(SpeechSpeedPreferences())
+    private val mutableReadingFontSize = MutableStateFlow(16)
     override val speechSpeeds: StateFlow<SpeechSpeedPreferences> = mutableSpeeds
+    override val readingFontSizeSp: StateFlow<Int> = mutableReadingFontSize
     private var band = 6.0f
     private var libraryLanguage = MaterialLanguage.ENGLISH
 
@@ -204,6 +223,10 @@ private class FakeLearnerPreferences : LearnerPreferences {
 
     override fun setSpeechSpeed(language: SpeechLanguage, speed: Float) {
         mutableSpeeds.value = mutableSpeeds.value.withSpeed(language, speed)
+    }
+
+    override fun setReadingFontSizeSp(sizeSp: Int) {
+        mutableReadingFontSize.value = sizeSp.coerceIn(12, 32)
     }
 }
 

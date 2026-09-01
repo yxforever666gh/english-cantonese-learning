@@ -30,6 +30,9 @@ data class SpeechSpeedPreferences(
 }
 
 const val DEFAULT_SPEECH_SPEED = 0.8f
+const val DEFAULT_READING_FONT_SIZE_SP = 16
+const val MIN_READING_FONT_SIZE_SP = 12
+const val MAX_READING_FONT_SIZE_SP = 32
 
 interface LearnerPreferences {
     fun learnerProfile(): LearnerProfile
@@ -46,15 +49,27 @@ interface LearnerPreferences {
                 mandarin = speechSpeed(SpeechLanguage.MANDARIN_CN),
             ),
         )
+    val showNewsTranslations: StateFlow<Boolean>
+        get() = MutableStateFlow(true)
+    val readingFontSizeSp: StateFlow<Int>
+        get() = MutableStateFlow(DEFAULT_READING_FONT_SIZE_SP)
     fun speechSpeed(language: SpeechLanguage): Float
     fun setSpeechSpeed(language: SpeechLanguage, speed: Float)
+    fun setShowNewsTranslations(show: Boolean) = Unit
+    fun setReadingFontSizeSp(sizeSp: Int) = Unit
 }
 
 class UserPreferences(context: Context) : LearnerPreferences {
     private val preferences = context.applicationContext.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
     private val mutableSpeechSpeeds: MutableStateFlow<SpeechSpeedPreferences>
+    private val mutableShowNewsTranslations: MutableStateFlow<Boolean>
+    private val mutableReadingFontSizeSp: MutableStateFlow<Int>
     override val speechSpeeds: StateFlow<SpeechSpeedPreferences>
         get() = mutableSpeechSpeeds.asStateFlow()
+    override val showNewsTranslations: StateFlow<Boolean>
+        get() = mutableShowNewsTranslations.asStateFlow()
+    override val readingFontSizeSp: StateFlow<Int>
+        get() = mutableReadingFontSizeSp.asStateFlow()
 
     init {
         preferences.edit(commit = true) {
@@ -69,6 +84,14 @@ class UserPreferences(context: Context) : LearnerPreferences {
             }
         }
         mutableSpeechSpeeds = MutableStateFlow(readSpeechSpeeds())
+        mutableShowNewsTranslations = MutableStateFlow(
+            preferences.getBoolean(SHOW_NEWS_TRANSLATIONS, true),
+        )
+        mutableReadingFontSizeSp = MutableStateFlow(
+            normalizeReadingFontSizeSp(
+                preferences.getInt(READING_FONT_SIZE_SP, DEFAULT_READING_FONT_SIZE_SP),
+            ),
+        )
     }
 
     override fun learnerProfile(): LearnerProfile = LearnerProfile(
@@ -98,6 +121,17 @@ class UserPreferences(context: Context) : LearnerPreferences {
         mutableSpeechSpeeds.value = mutableSpeechSpeeds.value.withSpeed(language, normalized)
     }
 
+    override fun setShowNewsTranslations(show: Boolean) {
+        preferences.edit { putBoolean(SHOW_NEWS_TRANSLATIONS, show) }
+        mutableShowNewsTranslations.value = show
+    }
+
+    override fun setReadingFontSizeSp(sizeSp: Int) {
+        val normalized = normalizeReadingFontSizeSp(sizeSp)
+        preferences.edit { putInt(READING_FONT_SIZE_SP, normalized) }
+        mutableReadingFontSizeSp.value = normalized
+    }
+
     private fun speedKey(language: SpeechLanguage): String = "speech_speed_${language.name.lowercase()}"
 
     private fun readSpeechSpeeds(): SpeechSpeedPreferences = SpeechSpeedPreferences(
@@ -118,6 +152,8 @@ class UserPreferences(context: Context) : LearnerPreferences {
         const val ENGLISH_READING = "english_reading"
         const val ARTICLE_LIBRARY_LANGUAGE = "article_library_language"
         const val SPEECH_SPEED_DEFAULTS_MIGRATED = "speech_speed_defaults_migrated_v2"
+        const val SHOW_NEWS_TRANSLATIONS = "show_news_translations"
+        const val READING_FONT_SIZE_SP = "reading_font_size_sp"
     }
 }
 
@@ -125,3 +161,6 @@ private fun normalizeSpeechSpeed(speed: Float): Float {
     if (!speed.isFinite()) return DEFAULT_SPEECH_SPEED
     return (speed.coerceIn(0.5f, 2.0f) * 10).roundToInt() / 10f
 }
+
+internal fun normalizeReadingFontSizeSp(sizeSp: Int): Int =
+    sizeSp.coerceIn(MIN_READING_FONT_SIZE_SP, MAX_READING_FONT_SIZE_SP)

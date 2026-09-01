@@ -33,8 +33,8 @@ android {
         applicationId = "com.example.englishcantoneselearning"
         minSdk = 26
         targetSdk = 36
-        versionCode = 13
-        versionName = "4.0"
+        versionCode = 15
+        versionName = "4.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         javaCompileOptions {
